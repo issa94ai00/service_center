@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.vue';
+
+@theme {
+    --font-sans: 'Segoe UI', 'Tahoma', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-arabic: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+}
+
+@layer base {
+    html {
+        direction: rtl;
+    }
+    body {
+        font-family: var(--font-sans);
+        @apply bg-slate-50 text-slate-900 antialiased;
+    }
+}
