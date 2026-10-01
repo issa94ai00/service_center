@@ -82,8 +82,9 @@
                 <div class="flex items-center gap-2 pb-0.5">
                     <button
                         type="button"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                        :class="dirty ? 'ring-2 ring-blue-200' : ''"
+                        :disabled="rangeInvalid"
+                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        :class="dirty && !rangeInvalid ? 'ring-2 ring-blue-200' : ''"
                         @click="applyFilters"
                     >
                         عرض
@@ -96,7 +97,8 @@
                     >
                         إعادة تعيين
                     </button>
-                    <span v-if="dirty" class="text-xs text-blue-700">تغييرات غير مطبّقة</span>
+                    <span v-if="rangeInvalid" class="text-xs text-red-600" role="alert">تاريخ البداية بعد تاريخ النهاية</span>
+                    <span v-else-if="dirty" class="text-xs text-blue-700">تغييرات غير مطبّقة</span>
                 </div>
             </div>
         </div>
@@ -203,6 +205,8 @@
                     :label="card.label"
                     :value="card.value"
                     :hint="card.hint"
+                    :icon="card.icon"
+                    :icon-class="card.iconClass"
                     :tone="card.tone"
                     :to="card.to"
                     :delta="card.delta"
@@ -367,7 +371,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import TrendChart from '../../components/charts/TrendChart.vue';
 import DashboardSkeleton from '../../components/dashboard/DashboardSkeleton.vue';
@@ -411,9 +415,7 @@ const applied = ref('');
 
 const greeting = computed(() => {
     const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return 'صباح الخير';
-    if (hour < 18) return 'مساء الخير';
-    return 'مساء الخير';
+    return hour >= 5 && hour < 12 ? 'صباح الخير' : 'مساء الخير';
 });
 
 const periodLabel = computed(() => {
@@ -456,6 +458,7 @@ const activePreset = computed(() =>
 );
 
 const dirty = computed(() => snapshot(filters) !== applied.value);
+const rangeInvalid = computed(() => Boolean(filters.from && filters.to && filters.from > filters.to));
 const canReset = computed(() => snapshot(filters) !== snapshot(defaults()));
 
 const quickActions = computed(() =>
@@ -463,8 +466,8 @@ const quickActions = computed(() =>
         { label: '＋ فاتورة بيع', to: { name: 'sales.create' }, permission: 'sales.create' },
         { label: '＋ فاتورة شراء', to: { name: 'purchases.create' }, permission: 'purchases.create' },
         { label: '＋ سند قبض', to: { name: 'payments.create', query: { type: 'CUSTOMER' } }, permission: 'payments.create' },
-        { label: '＋ استلام جهاز', to: { name: 'repairs' }, permission: 'repairs.create' },
-        { label: '＋ مصروف', to: { name: 'expenses' }, permission: 'expenses.create' },
+        { label: '＋ استلام جهاز', to: { name: 'repairs', query: { create: 1 } }, permission: 'repairs.create' },
+        { label: '＋ مصروف', to: { name: 'expenses', query: { create: 1 } }, permission: 'expenses.create' },
     ].filter((action) => can(action.permission))
 );
 
@@ -542,14 +545,6 @@ const kpiCards = computed(() => {
             icon: '📤',
             iconClass: 'bg-rose-50',
             to: can('expenses.view') ? { name: 'expenses' } : null,
-        },
-        {
-            label: 'إجمالي ذمم العملاء',
-            value: formatMoney(kpis.receivables),
-            hint: 'رصيد قائم، لا يخص الفترة',
-            icon: '👥',
-            iconClass: 'bg-violet-50',
-            to: can('reports.view') ? { name: 'reports', query: { tab: 'receivables' } } : null,
         },
     ];
 });
@@ -712,6 +707,7 @@ function applyPreset(preset) {
 }
 
 function applyFilters() {
+    if (rangeInvalid.value) return;
     load();
 }
 
@@ -749,7 +745,11 @@ function syncQuery() {
 
 // -------------------------------------------------------------------- loading
 
+/** Only the latest request may write to the screen; a slow earlier one is dropped. */
+let requestSeq = 0;
+
 async function load() {
+    const seq = ++requestSeq;
     if (data.value) refreshing.value = true;
     else loading.value = true;
 
@@ -758,16 +758,29 @@ async function load() {
     try {
         // compare: the previous period's window figures ride along in the same
         // response, so the change badges cost one request instead of two.
-        data.value = await dashboardApi.index({ from: filters.from, to: filters.to, compare: 1 });
+        const response = await dashboardApi.index({ from: filters.from, to: filters.to, compare: 1 });
+        if (seq !== requestSeq) return;
+        data.value = response;
         applied.value = snapshot(filters);
         loadedAt.value = new Date();
         syncQuery();
     } catch (e) {
+        if (seq !== requestSeq) return;
         error.value = e?.response?.data?.message || 'تعذّر تحميل لوحة التحكم';
     } finally {
-        loading.value = false;
-        refreshing.value = false;
+        if (seq === requestSeq) {
+            loading.value = false;
+            refreshing.value = false;
+        }
     }
+}
+
+// A tab left open over lunch should not greet the user with stale figures.
+const STALE_AFTER_MS = 5 * 60 * 1000;
+
+function onVisibilityChange() {
+    if (document.visibilityState !== 'visible' || loading.value || refreshing.value) return;
+    if (loadedAt.value && Date.now() - loadedAt.value.getTime() > STALE_AFTER_MS && !dirty.value) load();
 }
 
 // Browser back/forward replays a period exactly as it was shared or bookmarked.
@@ -783,7 +796,10 @@ watch(
 onMounted(() => {
     readQuery(route.query);
     load();
+    document.addEventListener('visibilitychange', onVisibilityChange);
 });
+
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibilityChange));
 </script>
 
 <style>

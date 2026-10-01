@@ -693,5 +693,12 @@ async function remove(row) {
     }
 }
 
-onMounted(fetchData);
+onMounted(() => {
+    fetchData();
+    // The dashboard's quick action lands here with ?create=1: open intake straight away.
+    if (route.query.create && can('repairs.create')) {
+        openCreate();
+        syncUrl();
+    }
+});
 </script>

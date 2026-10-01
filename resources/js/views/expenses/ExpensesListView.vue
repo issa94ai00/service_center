@@ -333,6 +333,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import EmptyState from '../../components/ui/EmptyState.vue';
 import Field from '../../components/ui/FormField.vue';
@@ -348,6 +349,8 @@ import { PAYMENT_METHODS, paymentMethodLabel } from '../../constants/paymentMeth
 import { csvNumber, downloadCsv } from '../../utils/csv';
 import { apiMessage, formatDateTime, formatMoney, isoDate } from '../../utils/format';
 
+const route = useRoute();
+const router = useRouter();
 const { can } = usePermissions();
 const toast = useToast();
 
@@ -592,5 +595,14 @@ function exportCsv() {
 onMounted(() => {
     loadCategories();
     load();
+    // The dashboard's quick action lands here with ?create=1: show the form, focused.
+    if (route.query.create) {
+        const { create, ...rest } = route.query;
+        router.replace({ query: rest }).catch(() => {});
+        if (can('expenses.create')) {
+            quickAddOpen.value = true;
+            nextTick(() => quickForm.value?.focus());
+        }
+    }
 });
 </script>
