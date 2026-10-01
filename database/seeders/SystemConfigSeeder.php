@@ -101,6 +101,13 @@ class SystemConfigSeeder extends Seeder
             ['key' => 'repair_payment_prefix', 'value' => 'RCV-', 'group' => 'numbers', 'type' => 'string'],
             ['key' => 'expense_prefix', 'value' => 'EXP-', 'group' => 'numbers', 'type' => 'string'],
             ['key' => 'material_sku_prefix', 'value' => 'M-', 'group' => 'numbers', 'type' => 'string'],
+            ['key' => 'print_paper_invoice', 'value' => 'a4', 'group' => 'print', 'type' => 'string'],
+            ['key' => 'print_paper_payment', 'value' => 'a4', 'group' => 'print', 'type' => 'string'],
+            ['key' => 'print_paper_repair', 'value' => 'a4', 'group' => 'print', 'type' => 'string'],
+            ['key' => 'print_paper_statement', 'value' => 'a4', 'group' => 'print', 'type' => 'string'],
+            ['key' => 'print_footer_note', 'value' => '', 'group' => 'print', 'type' => 'string'],
+            ['key' => 'print_repair_terms', 'value' => '', 'group' => 'print', 'type' => 'string'],
+            ['key' => 'print_show_signatures', 'value' => '1', 'group' => 'print', 'type' => 'bool'],
         ];
     }
 

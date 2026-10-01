@@ -121,6 +121,44 @@ class SettingsTest extends TestCase
         $this->assertNull(Setting::query()->where('key', 'not_a_real_setting')->first());
     }
 
+    public function test_each_document_kind_accepts_only_the_papers_it_has_a_layout_for(): void
+    {
+        $this->putJson('/api/settings', ['values' => [
+            'print_paper_repair' => '58mm',
+            'print_paper_invoice' => 'a5',
+        ]])->assertOk();
+
+        $this->assertSame('58mm', Setting::get('print_paper_repair'));
+        $this->assertSame('a5', Setting::get('print_paper_invoice'));
+
+        $this->putJson('/api/settings', ['values' => ['print_paper_statement' => '80mm']])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('values.print_paper_statement');
+
+        $this->putJson('/api/settings', ['values' => ['print_paper_payment' => 'letter']])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('values.print_paper_payment');
+
+        $this->putJson('/api/settings', ['values' => ['print_paper_invoice' => '']])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('values.print_paper_invoice');
+    }
+
+    public function test_printed_text_is_kept_short_enough_for_a_receipt(): void
+    {
+        $this->putJson('/api/settings', ['values' => ['print_footer_note' => str_repeat('ش', 301)]])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('values.print_footer_note');
+
+        $this->putJson('/api/settings', ['values' => [
+            'print_footer_note' => 'شكرًا لزيارتكم',
+            'print_show_signatures' => false,
+        ]])->assertOk();
+
+        $this->assertSame('شكرًا لزيارتكم', Setting::get('print_footer_note'));
+        $this->assertFalse(Setting::get('print_show_signatures'));
+    }
+
     public function test_it_requires_the_settings_permission(): void
     {
         $this->actingAs(User::factory()->create());

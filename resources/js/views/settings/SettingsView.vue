@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-4xl space-y-5">
         <div>
             <h1 class="text-xl font-bold text-slate-900">الإعدادات</h1>
-            <p class="text-sm text-slate-500">بيانات الشركة والعملة والسياسات المالية وترقيم المستندات</p>
+            <p class="text-sm text-slate-500">بيانات الشركة والعملة والسياسات المالية وترقيم المستندات والطباعة</p>
         </div>
 
         <div v-if="error" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -77,6 +77,8 @@
                 </div>
             </section>
 
+            <PrintSettingsSection v-if="hasPrintSettings" :values="values" :errors="fieldErrors" :dirty="dirty" />
+
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2">
                     <span
@@ -119,6 +121,8 @@ import { onBeforeRouteLeave } from 'vue-router';
 import { settingsApi } from '../../services/api';
 import { confirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
+import { usePrintPreferences } from '../../composables/usePrintPreferences';
+import PrintSettingsSection from '../../components/print/PrintSettingsSection.vue';
 
 // Presentation for each known key. Unknown keys still render, labelled by key,
 // so a setting added later is editable before this map is updated.
@@ -197,12 +201,19 @@ const saving = ref(false);
 const justSaved = ref(false);
 const error = ref('');
 const toast = useToast();
+const printPreferences = usePrintPreferences();
+
+// Print settings get their own section with paper pickers and a test page,
+// rather than the generic one-input-per-key layout.
+const CUSTOM_GROUPS = ['print'];
+const hasPrintSettings = computed(() => settings.value.some((s) => s.group === 'print'));
 
 const groups = computed(() => {
     const order = ['general', 'financial', 'numbers'];
     const byGroup = {};
 
     for (const setting of settings.value) {
+        if (CUSTOM_GROUPS.includes(setting.group)) continue;
         (byGroup[setting.group] ??= []).push(setting);
     }
 
@@ -272,6 +283,8 @@ async function save() {
 
         const response = await settingsApi.update(payload);
         hydrate(response.data ?? []);
+        // Print buttons cache the shop defaults; let them see the new ones.
+        printPreferences.refresh();
 
         toast.success('تم حفظ الإعدادات.');
         justSaved.value = true;

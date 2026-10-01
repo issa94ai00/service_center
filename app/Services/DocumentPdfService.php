@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\DocumentStatus;
+use App\Enums\PaperSize;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentType;
 use App\Models\Customer;
@@ -15,6 +16,7 @@ use App\Models\Supplier;
 use App\Services\Pdf\PdfRenderer;
 use App\Support\ArabicNumberToWords;
 use App\Support\Money;
+use App\Support\PrintSettings;
 use Illuminate\Support\Collection;
 
 /**
@@ -33,11 +35,12 @@ class DocumentPdfService
         protected PdfRenderer $renderer,
         protected StatementService $statements,
         protected RepairSettlementService $settlements,
+        protected PrintSettings $printing,
     ) {}
 
     // ---------------------------------------------------------------- invoices
 
-    public function salesInvoice(SalesInvoice $invoice): string
+    public function salesInvoice(SalesInvoice $invoice, ?PaperSize $paper = null): string
     {
         $invoice->load(['customer', 'repair', 'items.service', 'items.material', 'items.unit']);
 
@@ -56,8 +59,7 @@ class DocumentPdfService
             'line_total' => $this->money($item->line_total),
         ]);
 
-        return $this->renderer->render('pdf.invoice', [
-            'company' => $this->company(),
+        return $this->document(PrintSettings::INVOICE, 'invoice', $paper, [
             'invoice' => $invoice,
             'party' => $invoice->customer,
             'lines' => $lines,
@@ -80,7 +82,7 @@ class DocumentPdfService
         ], ($repair ? 'فاتورة صيانة ' : 'فاتورة بيع ').($invoice->invoice_no ?? ''));
     }
 
-    public function purchaseInvoice(PurchaseInvoice $invoice): string
+    public function purchaseInvoice(PurchaseInvoice $invoice, ?PaperSize $paper = null): string
     {
         $invoice->load(['supplier', 'items.material', 'items.unit']);
 
@@ -93,8 +95,7 @@ class DocumentPdfService
             'line_total' => $this->money($item->line_total),
         ]);
 
-        return $this->renderer->render('pdf.invoice', [
-            'company' => $this->company(),
+        return $this->document(PrintSettings::INVOICE, 'invoice', $paper, [
             'invoice' => $invoice,
             'party' => $invoice->supplier,
             'lines' => $lines,
@@ -115,7 +116,7 @@ class DocumentPdfService
 
     // ----------------------------------------------------------------- receipt
 
-    public function paymentReceipt(Payment $payment): string
+    public function paymentReceipt(Payment $payment, ?PaperSize $paper = null): string
     {
         $payment->load([
             'customer', 'supplier', 'repair',
@@ -143,8 +144,7 @@ class DocumentPdfService
             ];
         });
 
-        return $this->renderer->render('pdf.payment-receipt', [
-            'company' => $company,
+        return $this->document(PrintSettings::PAYMENT, 'payment-receipt', $paper, [
             'payment' => $payment,
             'party' => $isCustomer ? $payment->customer : $payment->supplier,
             'paymentDate' => $payment->payment_date?->format('Y-m-d'),
@@ -175,7 +175,7 @@ class DocumentPdfService
     /**
      * Receipt handed to a customer when a device is handed in for repair.
      */
-    public function repairReceipt(Repair $repair): string
+    public function repairReceipt(Repair $repair, ?PaperSize $paper = null): string
     {
         $repair->load(['customer', 'salesInvoice']);
 
@@ -189,8 +189,7 @@ class DocumentPdfService
         $paid = Money::fromDecimal($settlement['paid']);
         $due = Money::fromDecimal($settlement['due']);
 
-        return $this->renderer->render('pdf.repair-receipt', [
-            'company' => $this->company(),
+        return $this->document(PrintSettings::REPAIR, 'repair-receipt', $paper, [
             'repair' => $repair,
             'party' => $repair->customer,
             'receiptDate' => $repair->received_at?->format('Y-m-d H:i'),
@@ -214,10 +213,11 @@ class DocumentPdfService
     /**
      * @param  array{from?: ?string, to?: ?string}  $filters
      */
-    public function customerStatement(Customer $customer, array $filters = []): string
+    public function customerStatement(Customer $customer, array $filters = [], ?PaperSize $paper = null): string
     {
         return $this->statement(
             $this->statements->forCustomer($customer, $this->statementFilters($filters))['statement'],
+            paper: $paper,
             title: 'كشف حساب عميل',
             party: 'العميل',
             owed: 'الرصيد مستحق على العميل',
@@ -228,10 +228,11 @@ class DocumentPdfService
     /**
      * @param  array{from?: ?string, to?: ?string}  $filters
      */
-    public function supplierStatement(Supplier $supplier, array $filters = []): string
+    public function supplierStatement(Supplier $supplier, array $filters = [], ?PaperSize $paper = null): string
     {
         return $this->statement(
             $this->statements->forSupplier($supplier, $this->statementFilters($filters))['statement'],
+            paper: $paper,
             title: 'كشف حساب مورد',
             party: 'المورد',
             owed: 'الرصيد مستحق للمورد',
@@ -239,17 +240,92 @@ class DocumentPdfService
         );
     }
 
+    // ------------------------------------------------------------------ sample
+
+    /**
+     * A made-up sales invoice for checking a printer: paper width, margins,
+     * Arabic shaping and the footer text, without printing a real customer's
+     * document. Nothing here touches the database.
+     */
+    public function sample(PaperSize $paper): string
+    {
+        $invoice = (new SalesInvoice)->forceFill([
+            'invoice_no' => 'SL-TEST',
+            'invoice_date' => now(),
+            'posted_at' => now(),
+            'status' => DocumentStatus::POSTED,
+            'subtotal' => '57500.00',
+            'discount_amount' => '2500.00',
+            'total' => '55000.00',
+            'paid_amount' => '30000.00',
+            'remaining' => '25000.00',
+            'notes' => 'صفحة تجريبية للتحقّق من إعداد الطابعة — ليست مستندًا ماليًا.',
+        ]);
+
+        $lines = collect([
+            ['شاشة سامسونج A52 أصلية', 'مادة', 'قطعة', '1', '35000.00'],
+            ['تبديل شاشة', 'خدمة', 'جهاز', '1', '15000.00'],
+            ['لاصقة حماية زجاجية', 'مادة', 'قطعة', '3', '2500.00'],
+        ])->map(fn ($line) => [
+            'description' => $line[0],
+            'kind' => $line[1],
+            'unit' => $line[2],
+            'quantity' => $line[3],
+            'unit_price' => $this->money($line[4]),
+            'line_total' => $this->money((float) $line[3] * (float) $line[4]),
+        ]);
+
+        return $this->document(PrintSettings::INVOICE, 'invoice', $paper, [
+            'invoice' => $invoice,
+            'party' => (new Customer)->forceFill(['name' => 'عميل تجريبي', 'phone' => '0900 000 000']),
+            'lines' => $lines,
+            'showKind' => true,
+            'documentDate' => $invoice->invoice_date->format('Y-m-d'),
+            'dueDate' => null,
+            'totals' => $this->invoiceTotals($invoice),
+            'reference' => null,
+            'labels' => [
+                'title' => 'صفحة طباعة تجريبية',
+                'party' => 'العميل',
+                'status' => $this->statusLabel($invoice->status),
+                'signature_party' => 'توقيع العميل',
+            ],
+        ], 'صفحة تجريبية — '.$paper->label(), force: true);
+    }
+
     // ---------------------------------------------------------------- internals
+
+    /**
+     * Render one document on its paper: the one asked for when this kind of
+     * document can be laid out on it, otherwise the shop default. Thermal paper
+     * gets its own compact single-column template.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function document(string $kind, string $view, ?PaperSize $paper, array $data, string $footer, bool $force = false): string
+    {
+        $paper = $force && $paper !== null ? $paper : $this->printing->paperFor($kind, $paper);
+
+        return $this->renderer->render(
+            ($paper->isThermal() ? 'pdf.thermal.' : 'pdf.').$view,
+            $data + [
+                'company' => $this->company(),
+                'print' => $this->printing->options(),
+                'printedAt' => now()->format('Y-m-d H:i'),
+            ],
+            $footer,
+            $paper,
+        );
+    }
 
     /**
      * @param  array<string, mixed>  $statement
      */
-    protected function statement(array $statement, string $title, string $party, string $owed, string $prepaid): string
+    protected function statement(array $statement, ?PaperSize $paper, string $title, string $party, string $owed, string $prepaid): string
     {
         $balance = (float) $statement['closing_balance'];
 
-        return $this->renderer->render('pdf.statement', [
-            'company' => $this->company(),
+        return $this->document(PrintSettings::STATEMENT, 'statement', $paper, [
             'statement' => $statement,
             'printedOn' => now()->format('Y-m-d'),
             'money' => fn ($value) => $this->money($value),

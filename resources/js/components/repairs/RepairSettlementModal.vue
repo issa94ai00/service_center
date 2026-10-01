@@ -43,13 +43,17 @@
                         ✅ تمت التسوية
                         <span v-if="summary.settled_at" class="text-xs font-normal text-emerald-700">· {{ formatDateTime(summary.settled_at) }}</span>
                     </span>
-                    <button
+                    <PrintButton
                         v-if="summary.invoice"
-                        type="button"
-                        class="rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-50"
-                        :disabled="generating === `invoice-${summary.invoice.id}`"
-                        @click="printInvoice"
-                    >🖨️ الفاتورة {{ summary.invoice.invoice_no }}</button>
+                        kind="invoice"
+                        title="طباعة الفاتورة"
+                        :label="`🖨️ الفاتورة ${summary.invoice.invoice_no}`"
+                        busy-label="جارٍ الإصدار…"
+                        :load="(paper) => documentsApi.salesInvoice(summary.invoice.id, paper)"
+                        wrapper-class="rounded-lg border border-emerald-300 bg-white text-emerald-800"
+                        button-class="rounded-s-lg px-2.5 py-1 text-xs font-medium transition hover:bg-emerald-100 disabled:opacity-50"
+                        caret-class="rounded-e-lg border-s border-emerald-300 px-1.5 transition hover:bg-emerald-100 disabled:opacity-50"
+                    />
                 </div>
 
                 <!-- ما خرج به العميل فعلاً: الأجور والقطع كما قُيِّدت على الفاتورة. -->
@@ -396,7 +400,6 @@
                 </ul>
             </div>
 
-            <p v-if="pdfError" class="text-xs text-red-600">{{ pdfError }}</p>
         </div>
     </BaseModal>
 </template>
@@ -408,7 +411,7 @@ import Field from '../ui/FormField.vue';
 import MethodPicker from './PaymentMethodPicker.vue';
 import ScanBox from '../forms/ScanBox.vue';
 import { documentsApi, repairsApi } from '../../services/api';
-import { usePdf } from '../../composables/usePdf';
+import PrintButton from '../ui/PrintButton.vue';
 import { paymentMethodLabel } from '../../constants/paymentMethods';
 import { apiFieldErrors, apiMessage, formatDate, formatDateTime, formatMoney, formatQty } from '../../utils/format';
 
@@ -429,8 +432,6 @@ const MODES = [
     { value: 'settle', label: 'تسوية وتسليم' },
     { value: 'collect', label: 'قبض دفعة' },
 ];
-
-const { generating, pdfError, openPdf } = usePdf();
 
 const loading = ref(false);
 const busy = ref(false);
@@ -750,11 +751,6 @@ async function collect() {
     } finally {
         busy.value = false;
     }
-}
-
-function printInvoice() {
-    const id = summary.value?.invoice?.id;
-    if (id) openPdf(`invoice-${id}`, () => documentsApi.salesInvoice(id));
 }
 
 watch(() => [props.open, props.repair?.id], ([open]) => {

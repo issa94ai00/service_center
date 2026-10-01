@@ -123,6 +123,7 @@
     </tr>
 </table>
 
+@if($print['show_signatures'])
 <table class="signatures">
     <tr>
         <td class="sign" width="40%">{{ $labels['signature_party'] }}</td>
@@ -130,5 +131,6 @@
         <td class="sign" width="40%">توقيع المسؤول</td>
     </tr>
 </table>
+@endif
 
 @endsection

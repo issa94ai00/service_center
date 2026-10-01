@@ -64,6 +64,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/technicians/{technician}/statement', [StatementsController::class, 'technician']);
     });
 
+    // Paper sizes and the shop's defaults, for labelling the print buttons.
+    Route::get('/print/config', [DocumentPdfController::class, 'config']);
+
     // Printable documents. Each is authorised by the same policy as the record
     // it renders, so PDF access can never be wider than on-screen access.
     Route::prefix('pdf')->middleware('throttle:documents')->group(function () {
@@ -73,6 +76,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/repairs/{repair}', [DocumentPdfController::class, 'repairReceipt']);
         Route::get('/customers/{customer}/statement', [DocumentPdfController::class, 'customerStatement']);
         Route::get('/suppliers/{supplier}/statement', [DocumentPdfController::class, 'supplierStatement']);
+        Route::get('/sample', [DocumentPdfController::class, 'sample']);
     });
 
     Route::prefix('inventory')->group(function () {

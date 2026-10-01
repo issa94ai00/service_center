@@ -73,6 +73,15 @@
                     </div>
                     <button
                         type="button"
+                        title="تفضيلات الطباعة لهذا الجهاز"
+                        aria-label="تفضيلات الطباعة لهذا الجهاز"
+                        class="rounded-lg p-2 text-slate-400 transition hover:bg-blue-900 hover:text-white"
+                        @click="openPrintPreferences"
+                    >
+                        🖨️
+                    </button>
+                    <button
+                        type="button"
                         title="تسجيل الخروج"
                         class="rounded-lg p-2 text-slate-400 transition hover:bg-blue-900 hover:text-white"
                         @click="logout"
@@ -103,6 +112,7 @@
 
         <ToastHost />
         <ConfirmHost />
+        <PrintPreferencesHost />
     </div>
 </template>
 
@@ -112,6 +122,8 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import ToastHost from '../components/ui/ToastHost.vue';
 import ConfirmHost from '../components/ui/ConfirmHost.vue';
+import PrintPreferencesHost from '../components/print/PrintPreferencesHost.vue';
+import { openPrintPreferences } from '../composables/usePrintPreferences';
 
 const auth = useAuthStore();
 const route = useRoute();

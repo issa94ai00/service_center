@@ -16,10 +16,6 @@
             </button>
         </div>
 
-        <div v-if="pdfError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {{ pdfError }}
-        </div>
-
         <!-- Status chips: the shop's real question is "how many are ready, how
              many are still on the bench", so the counts lead and double as the
              filter itself. -->
@@ -209,7 +205,7 @@
                                             {{ nextStatus(row.status).short }} ←
                                         </button>
                                         <IconButton v-if="canSettle" :title="row.is_settled ? 'حساب البلاغ' : 'قبض / تسوية'" @click="openSettlement(row)">💵</IconButton>
-                                        <IconButton title="طباعة إيصال الاستلام" :busy="generating === `print-${row.id}`" @click="printReceipt(row)">🖨️</IconButton>
+                                        <PrintButton kind="repair" variant="icon" title="طباعة إيصال الاستلام" :load="(paper) => documentsApi.repairReceipt(row.id, paper)" />
                                         <IconButton v-if="can('repairs.edit')" title="تعديل" @click="openEdit(row)">✏️</IconButton>
                                         <IconButton v-if="can('repairs.delete')" title="حذف" danger @click="remove(row)">🗑️</IconButton>
                                     </div>
@@ -282,10 +278,8 @@
                             class="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700"
                             @click="openSettlement(row)"
                         >💵 {{ row.is_settled ? 'الحساب' : 'قبض / تسوية' }}</button>
-                        <button type="button" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 disabled:opacity-40"
-                            :disabled="generating === `print-${row.id}`" @click="printReceipt(row)">
-                            {{ generating === `print-${row.id}` ? 'جارٍ الإصدار...' : 'إيصال' }}
-                        </button>
+                        <PrintButton kind="repair" variant="outline" label="إيصال" busy-label="جارٍ الإصدار..."
+                            title="طباعة إيصال الاستلام" :load="(paper) => documentsApi.repairReceipt(row.id, paper)" />
                         <button v-if="can('repairs.edit')" type="button" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600" @click="openEdit(row)">تعديل</button>
                         <button v-if="can('repairs.delete')" type="button" class="rounded-lg px-3 py-1.5 text-xs text-red-600" @click="remove(row)">حذف</button>
                     </div>
@@ -348,11 +342,11 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePermissions } from '../../composables/usePermissions';
-import { usePdf } from '../../composables/usePdf';
 import { useToast } from '../../composables/useToast';
 import { confirm } from '../../composables/useConfirm';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import IconButton from '../../components/ui/IconButton.vue';
+import PrintButton from '../../components/ui/PrintButton.vue';
 import RepairForm from '../../components/forms/RepairForm.vue';
 import StatusControl from '../../components/repairs/RepairStatusControl.vue';
 import RepairDetails from '../../components/repairs/RepairDetails.vue';
@@ -364,7 +358,6 @@ import { OPEN_STATUSES, REPAIR_STATUSES, isOpenStatus, nextStatus, repairStatus 
 import { apiMessage, daysSince, formatMoney, relativeDays } from '../../utils/format';
 
 const { can } = usePermissions();
-const { generating, pdfError, openPdf } = usePdf();
 const toast = useToast();
 const route = useRoute();
 const router = useRouter();
@@ -679,10 +672,6 @@ function deliverWithoutSettlement() {
     const row = settling.value;
     settling.value = null;
     if (row) changeStatus(row, 'DELIVERED', { force: true });
-}
-
-function printReceipt(row) {
-    openPdf(`print-${row.id}`, () => documentsApi.repairReceipt(row.id));
 }
 
 async function remove(row) {

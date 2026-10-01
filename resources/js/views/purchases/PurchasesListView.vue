@@ -11,9 +11,6 @@
             </RouterLink>
         </div>
 
-        <div v-if="pdfError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {{ pdfError }}
-        </div>
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 p-4">
                 <input v-model.trim="search" type="search" placeholder="بحث برقم الفاتورة..."
@@ -57,9 +54,7 @@
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">
                                     <button class="text-slate-500 hover:text-slate-900" @click="openDetail(row)">عرض</button>
-                                    <button class="text-slate-500 hover:text-slate-900 disabled:opacity-40"
-                                        :disabled="generating === row.id" @click="printDocument(row)">
-                                        {{ generating === row.id ? '...' : 'طباعة' }}</button>
+                                    <PrintButton kind="invoice" title="طباعة الفاتورة" :load="(paper) => documentsApi.purchaseInvoice(row.id, paper)" />
                                     <RouterLink v-if="row.status === 'DRAFT'" :to="{ name: 'purchases.edit', params: { id: row.id } }"
                                         class="text-slate-500 hover:text-slate-900">تعديل</RouterLink>
                                     <button v-if="row.status === 'DRAFT' && can('purchases.post')"
@@ -127,7 +122,6 @@
 import { onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { documentsApi, purchasesApi } from '../../services/api';
-import { usePdf } from '../../composables/usePdf';
 import { useAuthStore } from '../../stores/auth';
 import { usePermissions } from '../../composables/usePermissions';
 import { confirm } from '../../composables/useConfirm';
@@ -135,13 +129,9 @@ import { useToast } from '../../composables/useToast';
 import { apiMessage } from '../../utils/format';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import StatusBadge from '../../components/ui/StatusBadge.vue';
+import PrintButton from '../../components/ui/PrintButton.vue';
 import PurchasePostModal from '../../components/purchases/PurchasePostModal.vue';
 
-const { generating, pdfError, openPdf } = usePdf();
-
-function printDocument(row) {
-    openPdf(row.id, () => documentsApi.purchaseInvoice(row.id));
-}
 
 const { can } = usePermissions();
 const auth = useAuthStore();

@@ -11,9 +11,6 @@
             </RouterLink>
         </div>
 
-        <div v-if="pdfError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {{ pdfError }}
-        </div>
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 p-4">
                 <div class="flex rounded-lg border border-slate-300 p-0.5">
@@ -78,9 +75,7 @@
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">
                                     <button class="text-slate-500 hover:text-slate-900" @click="openDetail(row)">عرض</button>
-                                    <button class="text-slate-500 hover:text-slate-900 disabled:opacity-40"
-                                        :disabled="generating === row.id" @click="printDocument(row)">
-                                        {{ generating === row.id ? '...' : 'طباعة' }}</button>
+                                    <PrintButton kind="payment" title="طباعة السند" :load="(paper) => documentsApi.paymentReceipt(row.id, paper)" />
                                     <RouterLink v-if="row.repair" :to="{ name: 'repairs', query: { search: row.repair.receipt_no } }"
                                         class="text-violet-600 hover:text-violet-800">البلاغ</RouterLink>
                                     <RouterLink v-if="row.status === 'DRAFT'" :to="{ name: 'payments.edit', params: { id: row.id } }"
@@ -152,7 +147,6 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { documentsApi, paymentsApi } from '../../services/api';
-import { usePdf } from '../../composables/usePdf';
 import { usePermissions } from '../../composables/usePermissions';
 import { useToast } from '../../composables/useToast';
 import { confirm } from '../../composables/useConfirm';
@@ -161,12 +155,8 @@ import { paymentMethodLabel } from '../../constants/paymentMethods';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import PaymentPostModal from '../../components/payments/PaymentPostModal.vue';
 import StatusBadge from '../../components/ui/StatusBadge.vue';
+import PrintButton from '../../components/ui/PrintButton.vue';
 
-const { generating, pdfError, openPdf } = usePdf();
-
-function printDocument(row) {
-    openPdf(row.id, () => documentsApi.paymentReceipt(row.id));
-}
 
 const { can } = usePermissions();
 const toast = useToast();

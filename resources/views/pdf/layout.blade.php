@@ -61,6 +61,34 @@
     .signatures td.sign { font-size: 8.5pt; color: #555; padding-top: 10mm; border-top: 0.5px solid #999; text-align: center; }
 
     .watermark-cancelled { color: #a11212; font-size: 11pt; font-weight: bold; }
+
+    .terms { margin-top: 5mm; font-size: 7.5pt; color: #444; border: 0.5px solid #ccc; padding: 2mm 3mm; }
+    .terms-title { font-weight: bold; margin-bottom: 1mm; }
+    .footer-note { margin-top: 6mm; text-align: center; font-size: 8.5pt; color: #333; }
+
+    @if($paper === \App\Enums\PaperSize::A5)
+    /* A5 is half the area of A4: same layout, tighter type and spacing. */
+    body { font-size: 8pt; }
+    .company-name { font-size: 12.5pt; }
+    .company-meta { font-size: 7pt; }
+    .doc-title { font-size: 11pt; }
+    .doc-no { font-size: 9pt; }
+    table.meta { margin-top: 3mm; }
+    table.meta td { padding: 1mm 1.5mm; font-size: 7.5pt; }
+    table.meta td.label { width: 17mm; }
+    table.lines { margin-top: 3.5mm; }
+    table.lines th { padding: 1.4mm 1mm; font-size: 7pt; }
+    table.lines td { padding: 1.3mm 1mm; font-size: 7.5pt; }
+    table.totals td { padding: 1mm 2mm; font-size: 8pt; }
+    table.totals tr.grand td { font-size: 9.5pt; }
+    table.status-badge { width: 22mm; }
+    table.status-badge td { padding: 1mm 1.5mm; font-size: 7pt; }
+    .notes { margin-top: 3.5mm; font-size: 7.5pt; }
+    .signatures { margin-top: 9mm; }
+    .signatures td.sign { font-size: 7.5pt; padding-top: 7mm; }
+    .terms { font-size: 6.5pt; margin-top: 3.5mm; }
+    .footer-note { font-size: 7.5pt; margin-top: 4mm; }
+    @endif
 </style>
 </head>
 <body>
@@ -91,6 +119,10 @@
 <div class="rule" style="margin-top:3mm;"></div>
 
 @yield('content')
+
+@if(!empty($print['footer_note']))
+    <div class="footer-note">{!! nl2br(e($print['footer_note'])) !!}</div>
+@endif
 
 </body>
 </html>

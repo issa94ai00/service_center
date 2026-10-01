@@ -37,26 +37,37 @@
         <div v-if="canPrintReceipt || (paymentId && canPrintPayment)" class="space-y-2">
             <p class="text-xs font-semibold text-slate-500">اطبع للعميل</p>
             <div class="grid gap-2 sm:grid-cols-2">
-                <button
+                <!-- The paper is named on the button: at a counter with both a
+                     till printer and an A4 one, it is the first thing to check. -->
+                <PrintButton
                     v-if="canPrintReceipt"
-                    type="button"
-                    class="flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 disabled:opacity-50"
-                    :disabled="generating === receiptKey"
-                    @click="printReceipt"
+                    kind="repair"
+                    title="إيصال استلام الجهاز"
+                    :load="(paper) => documentsApi.repairReceipt(repair.id, paper)"
+                    wrapper-class="rounded-xl border border-blue-200 bg-blue-50 text-blue-800"
+                    button-class="flex flex-1 flex-col items-center justify-center rounded-s-xl px-4 py-3 text-sm font-semibold transition hover:bg-blue-100 disabled:opacity-50"
+                    caret-class="rounded-e-xl border-s border-blue-200 px-2.5 transition hover:bg-blue-100 disabled:opacity-50"
                 >
-                    🖨️ {{ generating === receiptKey ? 'جارٍ الإصدار…' : 'إيصال استلام الجهاز' }}
-                </button>
-                <button
+                    <template #default="{ busy, paper }">
+                        <span>🖨️ {{ busy ? 'جارٍ الإصدار…' : 'إيصال استلام الجهاز' }}</span>
+                        <span class="text-[11px] font-normal text-blue-700/80">{{ paper.label }}</span>
+                    </template>
+                </PrintButton>
+                <PrintButton
                     v-if="paymentId && canPrintPayment"
-                    type="button"
-                    class="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-50"
-                    :disabled="generating === paymentKey"
-                    @click="printPayment"
+                    kind="payment"
+                    title="سند القبض"
+                    :load="(paper) => documentsApi.paymentReceipt(paymentId, paper)"
+                    wrapper-class="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800"
+                    button-class="flex flex-1 flex-col items-center justify-center rounded-s-xl px-4 py-3 text-sm font-semibold transition hover:bg-emerald-100 disabled:opacity-50"
+                    caret-class="rounded-e-xl border-s border-emerald-200 px-2.5 transition hover:bg-emerald-100 disabled:opacity-50"
                 >
-                    🧾 {{ generating === paymentKey ? 'جارٍ الإصدار…' : `سند القبض (${money(paid)})` }}
-                </button>
+                    <template #default="{ busy, paper }">
+                        <span>🧾 {{ busy ? 'جارٍ الإصدار…' : `سند القبض (${money(paid)})` }}</span>
+                        <span class="text-[11px] font-normal text-emerald-700/80">{{ paper.label }}</span>
+                    </template>
+                </PrintButton>
             </div>
-            <p v-if="pdfError" class="text-xs text-red-600">{{ pdfError }}</p>
         </div>
 
         <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-between">
@@ -76,7 +87,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { usePdf } from '../../composables/usePdf';
+import PrintButton from '../ui/PrintButton.vue';
 import { usePermissions } from '../../composables/usePermissions';
 import { documentsApi } from '../../services/api';
 import { formatMoney } from '../../utils/format';
@@ -89,7 +100,6 @@ const props = defineProps({
 
 defineEmits(['close', 'again']);
 
-const { generating, pdfError, openPdf } = usePdf();
 const { can } = usePermissions();
 
 // Mirrors the policies behind the two PDF endpoints, so a clerk is never
@@ -99,18 +109,8 @@ const canPrintPayment = computed(() => can('payments.create') || can('statements
 
 const paid = computed(() => Number(props.repair.paid ?? 0));
 const due = computed(() => Number(props.repair.due ?? 0));
-const receiptKey = computed(() => `intake-${props.repair.id}`);
-const paymentKey = computed(() => `intake-payment-${props.paymentId}`);
 
 function money(value) {
     return formatMoney(value);
-}
-
-function printReceipt() {
-    openPdf(receiptKey.value, () => documentsApi.repairReceipt(props.repair.id));
-}
-
-function printPayment() {
-    openPdf(paymentKey.value, () => documentsApi.paymentReceipt(props.paymentId));
 }
 </script>

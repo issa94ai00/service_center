@@ -19,14 +19,18 @@
                 >
                     🖨 طباعة الصفحة
                 </button>
-                <button
+                <PrintButton
                     v-if="kind.pdf"
-                    :disabled="!statement || generating"
-                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"
-                    @click="downloadPdf"
-                >
-                    {{ generating ? 'جارٍ التجهيز...' : '📄 كشف PDF' }}
-                </button>
+                    kind="statement"
+                    title="كشف PDF"
+                    label="📄 كشف PDF"
+                    busy-label="جارٍ التجهيز..."
+                    :disabled="!statement"
+                    :load="loadPdf"
+                    wrapper-class="rounded-lg bg-blue-600 text-white"
+                    button-class="rounded-s-lg px-4 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:opacity-40"
+                    caret-class="rounded-e-lg border-s border-blue-500 px-2 transition hover:bg-blue-700 disabled:opacity-40"
+                />
             </div>
         </div>
 
@@ -61,8 +65,8 @@
                 </button>
             </div>
 
-            <div v-if="error || pdfError" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {{ error || pdfError }}
+            <div v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {{ error }}
             </div>
 
             <template v-if="statement">
@@ -207,7 +211,7 @@
 import { onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { documentsApi, statementsApi } from '../../services/api';
-import { usePdf } from '../../composables/usePdf';
+import PrintButton from '../../components/ui/PrintButton.vue';
 
 const route = useRoute();
 
@@ -223,7 +227,7 @@ const KINDS = {
         owed: 'مستحق على العميل',
         prepaid: 'رصيد لصالح العميل',
         fetch: (id, params) => statementsApi.customer(id, params),
-        pdf: (id, params) => documentsApi.customerStatement(id, params),
+        pdf: (id, params, paper) => documentsApi.customerStatement(id, params, paper),
     },
     supplier: {
         key: 'supplier',
@@ -231,7 +235,7 @@ const KINDS = {
         owed: 'مستحق للمورد',
         prepaid: 'رصيد لصالحنا',
         fetch: (id, params) => statementsApi.supplier(id, params),
-        pdf: (id, params) => documentsApi.supplierStatement(id, params),
+        pdf: (id, params, paper) => documentsApi.supplierStatement(id, params, paper),
     },
     technician: {
         key: 'technician',
@@ -327,21 +331,17 @@ function goTo(target) {
     page.value = target;
 }
 
-const { generating, pdfError, openPdf } = usePdf();
-
 function printSheet() {
     window.print();
 }
 
 // The PDF renders the whole period, not just the page on screen.
-function downloadPdf() {
+function loadPdf(paper) {
     const params = {};
     if (filters.from) params.from = filters.from;
     if (filters.to) params.to = filters.to;
 
-    if (!kind.pdf) return;
-
-    openPdf('statement', () => kind.pdf(route.params.id, params));
+    return kind.pdf(route.params.id, params, paper);
 }
 
 async function load() {

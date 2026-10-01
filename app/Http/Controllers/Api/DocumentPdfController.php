@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\PaperSize;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Payment;
@@ -10,49 +11,52 @@ use App\Models\Repair;
 use App\Models\SalesInvoice;
 use App\Models\Supplier;
 use App\Services\DocumentPdfService;
+use App\Support\PrintSettings;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class DocumentPdfController extends Controller
 {
     public function __construct(protected DocumentPdfService $documents) {}
 
-    public function salesInvoice(SalesInvoice $sale): Response
+    public function salesInvoice(Request $request, SalesInvoice $sale): Response
     {
         $this->authorize('view', $sale);
 
         return $this->stream(
-            $this->documents->salesInvoice($sale),
+            $this->documents->salesInvoice($sale, $this->paper($request, PrintSettings::INVOICE)),
             $this->filename('sales-invoice', $sale->invoice_no, $sale->id),
         );
     }
 
-    public function purchaseInvoice(PurchaseInvoice $purchase): Response
+    public function purchaseInvoice(Request $request, PurchaseInvoice $purchase): Response
     {
         $this->authorize('view', $purchase);
 
         return $this->stream(
-            $this->documents->purchaseInvoice($purchase),
+            $this->documents->purchaseInvoice($purchase, $this->paper($request, PrintSettings::INVOICE)),
             $this->filename('purchase-invoice', $purchase->invoice_no, $purchase->id),
         );
     }
 
-    public function paymentReceipt(Payment $payment): Response
+    public function paymentReceipt(Request $request, Payment $payment): Response
     {
         $this->authorize('view', $payment);
 
         return $this->stream(
-            $this->documents->paymentReceipt($payment),
+            $this->documents->paymentReceipt($payment, $this->paper($request, PrintSettings::PAYMENT)),
             $this->filename('payment-receipt', $payment->reference_no, $payment->id),
         );
     }
 
-    public function repairReceipt(Repair $repair): Response
+    public function repairReceipt(Request $request, Repair $repair): Response
     {
         $this->authorize('view', $repair);
 
         return $this->stream(
-            $this->documents->repairReceipt($repair),
+            $this->documents->repairReceipt($repair, $this->paper($request, PrintSettings::REPAIR)),
             $this->filename('repair-receipt', $repair->receipt_no, $repair->id),
         );
     }
@@ -64,7 +68,7 @@ class DocumentPdfController extends Controller
         $filters = $this->periodFilters($request);
 
         return $this->stream(
-            $this->documents->customerStatement($customer, $filters),
+            $this->documents->customerStatement($customer, $filters, $this->paper($request, PrintSettings::STATEMENT)),
             $this->filename('customer-statement', null, $customer->id),
         );
     }
@@ -76,12 +80,60 @@ class DocumentPdfController extends Controller
         $filters = $this->periodFilters($request);
 
         return $this->stream(
-            $this->documents->supplierStatement($supplier, $filters),
+            $this->documents->supplierStatement($supplier, $filters, $this->paper($request, PrintSettings::STATEMENT)),
             $this->filename('supplier-statement', null, $supplier->id),
         );
     }
 
+    /**
+     * A test page on a chosen paper, for lining up a printer. It carries no
+     * real data, so any signed-in user may print one.
+     */
+    public function sample(Request $request): Response
+    {
+        $paper = $this->paper($request, PrintSettings::INVOICE) ?? PaperSize::A4;
+
+        return $this->stream($this->documents->sample($paper), 'print-test-'.$paper->value.'.pdf');
+    }
+
+    /**
+     * What the print buttons need to label themselves: every paper, which
+     * papers each document kind supports, and the shop default for each.
+     */
+    public function config(PrintSettings $printing): JsonResponse
+    {
+        return response()->json(['data' => [
+            'papers' => array_map(fn (PaperSize $paper) => [
+                'value' => $paper->value,
+                'label' => $paper->label(),
+                'thermal' => $paper->isThermal(),
+                'width' => $paper->width(),
+            ], PaperSize::cases()),
+            'supported' => collect(array_keys(PrintSettings::supported()))
+                ->mapWithKeys(fn (string $kind) => [$kind => PrintSettings::supportedValues($kind)])
+                ->all(),
+            'defaults' => $printing->defaults(),
+        ]]);
+    }
+
     // ---------------------------------------------------------------- internals
+
+    /**
+     * The paper asked for in ?paper=, if any. One the document kind has no
+     * layout for is refused rather than silently swapped for the default, so
+     * the printed page always matches the size the clerk picked.
+     */
+    protected function paper(Request $request, string $kind): ?PaperSize
+    {
+        $validated = $request->validate([
+            'paper' => ['nullable', 'string', Rule::in(PrintSettings::supportedValues($kind))],
+        ], [
+            'paper.in' => 'حجم الورق غير مدعوم لهذا المستند.',
+        ]);
+
+        return PaperSize::tryFrom((string) ($validated['paper'] ?? ''));
+    }
+
 
     /**
      * @return array{from: ?string, to: ?string}

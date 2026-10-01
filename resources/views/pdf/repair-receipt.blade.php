@@ -102,6 +102,16 @@
     <div class="notes watermark-cancelled">هذا البلاغ ملغي.</div>
 @endif
 
+{{-- The shop's own terms — how long an unclaimed device is kept, what the
+     warranty covers — printed where the customer signs for them. --}}
+@if(!empty($print['repair_terms']))
+    <div class="terms">
+        <div class="terms-title">شروط الصيانة</div>
+        {!! nl2br(e($print['repair_terms'])) !!}
+    </div>
+@endif
+
+@if($print['show_signatures'])
 <table class="signatures">
     <tr>
         <td class="sign" width="40%">توقيع العميل المستلم</td>
@@ -109,5 +119,6 @@
         <td class="sign" width="40%">توقيع موظف الاستلام</td>
     </tr>
 </table>
+@endif
 
 @endsection

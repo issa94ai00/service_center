@@ -545,17 +545,29 @@ export const statementsApi = {
  * HTML error page) and the session's XSRF handling stays consistent.
  */
 async function fetchPdf(url, params = {}) {
-    const { data } = await api.get(url, { params, responseType: 'blob' });
+    // An omitted paper means "the shop default"; the server resolves it.
+    const query = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''));
+    const { data } = await api.get(url, { params: query, responseType: 'blob' });
     return URL.createObjectURL(data);
 }
 
 export const documentsApi = {
-    salesInvoice: (id) => fetchPdf(`/pdf/sales/${id}`),
-    purchaseInvoice: (id) => fetchPdf(`/pdf/purchases/${id}`),
-    paymentReceipt: (id) => fetchPdf(`/pdf/payments/${id}`),
-    repairReceipt: (id) => fetchPdf(`/pdf/repairs/${id}`),
-    customerStatement: (id, params) => fetchPdf(`/pdf/customers/${id}/statement`, params),
-    supplierStatement: (id, params) => fetchPdf(`/pdf/suppliers/${id}/statement`, params),
+    salesInvoice: (id, paper) => fetchPdf(`/pdf/sales/${id}`, { paper }),
+    purchaseInvoice: (id, paper) => fetchPdf(`/pdf/purchases/${id}`, { paper }),
+    paymentReceipt: (id, paper) => fetchPdf(`/pdf/payments/${id}`, { paper }),
+    repairReceipt: (id, paper) => fetchPdf(`/pdf/repairs/${id}`, { paper }),
+    customerStatement: (id, params, paper) => fetchPdf(`/pdf/customers/${id}/statement`, { ...params, paper }),
+    supplierStatement: (id, params, paper) => fetchPdf(`/pdf/suppliers/${id}/statement`, { ...params, paper }),
+    /** A made-up invoice for lining up a printer. */
+    sample: (paper) => fetchPdf('/pdf/sample', { paper }),
+};
+
+export const printApi = {
+    /** Papers, which document kinds support which, and the shop defaults. */
+    async config() {
+        const { data } = await api.get('/print/config');
+        return data.data;
+    },
 };
 
 export const inventoryApi = {
