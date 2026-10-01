@@ -7,6 +7,7 @@ use App\Http\Requests\ServiceStoreRequest;
 use App\Http\Requests\ServiceUpdateRequest;
 use App\Http\Resources\ServiceResource;
 use App\Models\Service;
+use App\Services\CatalogArchiveService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,12 +15,17 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ServicesController extends Controller
 {
+    public function __construct(protected CatalogArchiveService $archive) {}
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Service::class);
 
+        $archived = $request->input('status') === 'archived';
+
         $services = Service::query()
             ->with('unit')
+            ->when($archived, fn (Builder $query) => $this->archive->withReferenceFlag($query->onlyTrashed(), Service::class))
             ->when($request->filled('search'), function (Builder $query) use ($request) {
                 $query->where('name', 'like', "%{$request->search}%");
             })
@@ -29,10 +35,12 @@ class ServicesController extends Controller
             ->when($request->filled('is_active'), function (Builder $query) use ($request) {
                 $query->where('is_active', (bool) $request->is_active);
             })
-            ->orderBy('name')
+            ->when($archived, fn (Builder $query) => $query->latest('deleted_at'), fn (Builder $query) => $query->orderBy('name'))
             ->paginate($request->integer('per_page', 15));
 
-        return ServiceResource::collection($services);
+        return ServiceResource::collection($services)->additional([
+            'counts' => ['archived' => Service::onlyTrashed()->count()],
+        ]);
     }
 
     public function store(ServiceStoreRequest $request): JsonResponse
@@ -70,18 +78,42 @@ class ServicesController extends Controller
         ]);
     }
 
+    /**
+     * Archive. The everyday delete: works even when invoices use the service,
+     * and can be undone.
+     */
     public function destroy(Service $service): JsonResponse
     {
         $this->authorize('delete', $service);
 
-        if ($service->invoiceItems()->exists()) {
-            return response()->json([
-                'message' => __('This service is used in invoices and cannot be deleted.'),
-            ], 422);
-        }
+        $this->archive->archive($service);
 
-        $service->delete();
+        return response()->json([
+            'message' => __('أُرشفت الخدمة «:name».', ['name' => $service->name]),
+            'data' => ['id' => $service->id],
+        ]);
+    }
 
-        return response()->json(['message' => __('Service deleted successfully.')]);
+    public function restore(Service $service): JsonResponse
+    {
+        $this->authorize('delete', $service);
+
+        $this->archive->restore($service);
+        $service->load('unit');
+
+        return response()->json([
+            'message' => __('استُعيدت الخدمة «:name».', ['name' => $service->name]),
+            'data' => new ServiceResource($service),
+        ]);
+    }
+
+    /** Permanent removal of an archived service no invoice ever used. */
+    public function forceDelete(Service $service): JsonResponse
+    {
+        $this->authorize('delete', $service);
+
+        $this->archive->forceDelete($service);
+
+        return response()->json(['message' => __('حُذفت الخدمة «:name» نهائياً.', ['name' => $service->name])]);
     }
 }

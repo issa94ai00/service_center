@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CatalogRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SalesInvoiceStoreRequest extends FormRequest
@@ -22,8 +23,8 @@ class SalesInvoiceStoreRequest extends FormRequest
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.line_type' => ['required', 'in:SERVICE,MATERIAL'],
-            'items.*.service_id' => ['required_if:items.*.line_type,SERVICE', 'exists:services,id'],
-            'items.*.material_id' => ['required_if:items.*.line_type,MATERIAL', 'exists:materials,id'],
+            'items.*.service_id' => ['required_if:items.*.line_type,SERVICE', CatalogRules::service()],
+            'items.*.material_id' => ['required_if:items.*.line_type,MATERIAL', CatalogRules::material()],
             'items.*.description' => ['nullable', 'string', 'max:255'],
             'items.*.unit_id' => ['nullable', 'exists:service_units,id'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
@@ -35,5 +36,13 @@ class SalesInvoiceStoreRequest extends FormRequest
     public function rules(): array
     {
         return $this->baseRules();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return CatalogRules::messages();
     }
 }

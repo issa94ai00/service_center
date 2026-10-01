@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Validation\Rule;
-
 class MaterialUpdateRequest extends MaterialStoreRequest
 {
     public function authorize(): bool
@@ -19,8 +17,7 @@ class MaterialUpdateRequest extends MaterialStoreRequest
     public function rules(): array
     {
         $rules = $this->baseRules();
-        $rules['sku'] = ['sometimes', 'string', 'max:50', Rule::unique('materials', 'sku')->ignore($this->route('material'))];
-        $rules['barcode'] = ['nullable', 'string', 'max:64', Rule::unique('materials', 'barcode')->ignore($this->route('material'))];
+        $rules['sku'] = ['sometimes', 'string', 'max:50', $this->uniqueCode('sku')];
 
         return array_combine(
             array_keys($rules),

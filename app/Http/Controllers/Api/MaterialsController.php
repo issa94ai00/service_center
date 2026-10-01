@@ -7,20 +7,25 @@ use App\Http\Requests\MaterialStoreRequest;
 use App\Http\Requests\MaterialUpdateRequest;
 use App\Http\Resources\MaterialResource;
 use App\Models\Material;
+use App\Services\CatalogArchiveService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 
 class MaterialsController extends Controller
 {
+    public function __construct(protected CatalogArchiveService $archive) {}
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Material::class);
 
+        $archived = $request->input('status') === 'archived';
+
         $materials = Material::query()
             ->with(['category', 'unit'])
+            ->when($archived, fn (Builder $query) => $this->archive->withReferenceFlag($query->onlyTrashed(), Material::class))
             ->when($request->filled('search'), function (Builder $query) use ($request) {
                 $query->where(function (Builder $q) use ($request) {
                     $q->where('name', 'like', "%{$request->search}%")
@@ -37,10 +42,12 @@ class MaterialsController extends Controller
             ->when($request->filled('is_active'), function (Builder $query) use ($request) {
                 $query->where('is_active', (bool) $request->is_active);
             })
-            ->orderBy('name')
+            ->when($archived, fn (Builder $query) => $query->latest('deleted_at'), fn (Builder $query) => $query->orderBy('name'))
             ->paginate($request->integer('per_page', 15));
 
-        return MaterialResource::collection($materials);
+        return MaterialResource::collection($materials)->additional([
+            'counts' => ['archived' => Material::onlyTrashed()->count()],
+        ]);
     }
 
     /**
@@ -70,9 +77,18 @@ class MaterialsController extends Controller
             ->first();
 
         if (! $material) {
+            // A scan of an archived item is a common, fixable surprise: say so
+            // instead of "unknown code".
+            $archived = Material::onlyTrashed()
+                ->where(fn (Builder $q) => $q->where('barcode', $code)->orWhere('sku', $code))
+                ->value('name');
+
             return response()->json([
                 'data' => null,
-                'message' => __('لا توجد مادة فعّالة بالرمز :code.', ['code' => $code]),
+                'archived' => $archived !== null,
+                'message' => $archived !== null
+                    ? __('الرمز :code لمادة مؤرشفة «:name» — استعدها من أرشيف المواد لبيعها.', ['code' => $code, 'name' => $archived])
+                    : __('لا توجد مادة فعّالة بالرمز :code.', ['code' => $code]),
             ], 404);
         }
 
@@ -115,22 +131,42 @@ class MaterialsController extends Controller
         ]);
     }
 
+    /**
+     * Archive. The everyday delete: works even with sales and stock history,
+     * and can be undone.
+     */
     public function destroy(Material $material): JsonResponse
     {
         $this->authorize('delete', $material);
 
-        $referenced = DB::table('stock_movements')->where('material_id', $material->id)->exists()
-            || DB::table('sales_invoice_items')->where('material_id', $material->id)->exists()
-            || DB::table('purchase_invoice_items')->where('material_id', $material->id)->exists();
+        $this->archive->archive($material);
 
-        if ($referenced) {
-            return response()->json([
-                'message' => __('This material has stock or invoice history and cannot be deleted.'),
-            ], 422);
-        }
+        return response()->json([
+            'message' => __('أُرشفت المادة «:name».', ['name' => $material->name]),
+            'data' => ['id' => $material->id],
+        ]);
+    }
 
-        $material->delete();
+    public function restore(Material $material): JsonResponse
+    {
+        $this->authorize('delete', $material);
 
-        return response()->json(['message' => __('Material deleted successfully.')]);
+        $this->archive->restore($material);
+        $material->load(['category', 'unit']);
+
+        return response()->json([
+            'message' => __('استُعيدت المادة «:name».', ['name' => $material->name]),
+            'data' => new MaterialResource($material),
+        ]);
+    }
+
+    /** Permanent removal of an archived material nothing ever referred to. */
+    public function forceDelete(Material $material): JsonResponse
+    {
+        $this->authorize('delete', $material);
+
+        $this->archive->forceDelete($material);
+
+        return response()->json(['message' => __('حُذفت المادة «:name» نهائياً.', ['name' => $material->name])]);
     }
 }

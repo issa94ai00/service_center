@@ -51,7 +51,7 @@ class InventoryService
             $strict = Setting::get('inventory_sale_policy', 'strict') === 'strict';
 
             foreach ($data['items'] as $raw) {
-                $material = Material::query()->whereKey($raw['material_id'])->lockForUpdate()->firstOrFail();
+                $material = Material::withTrashed()->whereKey($raw['material_id'])->lockForUpdate()->firstOrFail();
 
                 $direction = MovementDirection::from($raw['direction']);
                 $quantity = $this->quantity($raw['quantity']);
@@ -110,7 +110,7 @@ class InventoryService
             $date = now()->toDateString();
 
             foreach ($adjustment->items as $item) {
-                $material = Material::query()->whereKey($item->material_id)->lockForUpdate()->firstOrFail();
+                $material = Material::withTrashed()->whereKey($item->material_id)->lockForUpdate()->firstOrFail();
 
                 $original = StockMovement::query()
                     ->where('source_type', MovementSourceType::INVENTORY_ADJUSTMENT)
@@ -159,7 +159,7 @@ class InventoryService
 
     protected function applyToStock(int $materialId, MovementDirection $direction, string $quantity): void
     {
-        $column = Material::query()->whereKey($materialId);
+        $column = Material::withTrashed()->whereKey($materialId);
 
         $direction === MovementDirection::IN
             ? $column->increment('stock_quantity', $quantity)

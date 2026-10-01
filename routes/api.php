@@ -112,6 +112,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->parameters(['service_unit' => 'service_unit']);
     Route::apiResource('/services', ServicesController::class)
         ->parameters(['service' => 'service']);
+    Route::post('/services/{service}/restore', [ServicesController::class, 'restore'])->withTrashed();
+    Route::delete('/services/{service}/force', [ServicesController::class, 'forceDelete'])->withTrashed();
 
     Route::get('/repairs/customer-options', [RepairsController::class, 'customerOptions']);
     Route::get('/repairs/brand-options', [RepairsController::class, 'brandOptions']);
@@ -128,6 +130,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/materials/lookup', [MaterialsController::class, 'lookup']);
     Route::apiResource('/materials', MaterialsController::class)
         ->parameters(['material' => 'material']);
+    Route::post('/materials/{material}/restore', [MaterialsController::class, 'restore'])->withTrashed();
+    Route::delete('/materials/{material}/force', [MaterialsController::class, 'forceDelete'])->withTrashed();
 
     Route::get('/purchases/supplier-options', [PurchasesController::class, 'supplierOptions']);
     Route::get('/purchases/price-suggestions', [PurchasesController::class, 'priceSuggestions']);

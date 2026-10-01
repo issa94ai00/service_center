@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CatalogRules;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -38,8 +39,8 @@ class RepairSettleRequest extends FormRequest
             'items.*.line_type' => ['required', 'in:SERVICE,MATERIAL'],
             // سطر الخدمة قد يكون أجرة حرّة بلا خدمة معرَّفة، فالخدمة اختيارية
             // هنا خلافاً لفاتورة البيع؛ أمّا المادة فبلا صنف لا مخزون يُخصم.
-            'items.*.service_id' => ['nullable', 'exists:services,id'],
-            'items.*.material_id' => ['required_if:items.*.line_type,MATERIAL', 'nullable', 'exists:materials,id'],
+            'items.*.service_id' => ['nullable', CatalogRules::service()],
+            'items.*.material_id' => ['required_if:items.*.line_type,MATERIAL', 'nullable', CatalogRules::material()],
             'items.*.description' => ['nullable', 'string', 'max:255'],
             'items.*.unit_id' => ['nullable', 'exists:service_units,id'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:99999999'],
@@ -87,6 +88,7 @@ class RepairSettleRequest extends FormRequest
             'collect_amount.min' => 'المبلغ المحصَّل لا يمكن أن يكون سالباً.',
             'commission_rate.min' => 'نسبة الخبير يجب أن تكون بين ٠ و ١٠٠.',
             'commission_rate.max' => 'نسبة الخبير يجب أن تكون بين ٠ و ١٠٠.',
+            ...CatalogRules::messages(),
             'items.*.material_id.required_if' => 'اختر قطعة الغيار من المخزون.',
             'items.*.quantity.required' => 'أدخل كمية السطر.',
             'items.*.quantity.gt' => 'كمية السطر يجب أن تكون أكبر من صفر.',

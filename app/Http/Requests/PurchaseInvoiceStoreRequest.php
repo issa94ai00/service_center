@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CatalogRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PurchaseInvoiceStoreRequest extends FormRequest
@@ -21,7 +22,7 @@ class PurchaseInvoiceStoreRequest extends FormRequest
             'discount_value' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.material_id' => ['required', 'exists:materials,id'],
+            'items.*.material_id' => ['required', CatalogRules::material()],
             'items.*.description' => ['nullable', 'string', 'max:255'],
             'items.*.unit_id' => ['required', 'exists:service_units,id'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
@@ -33,5 +34,13 @@ class PurchaseInvoiceStoreRequest extends FormRequest
     public function rules(): array
     {
         return $this->baseRules();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return CatalogRules::messages();
     }
 }

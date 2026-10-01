@@ -95,7 +95,7 @@ class InvoiceService
                     userId: $userId
                 );
 
-                Material::query()->whereKey($item->material_id)->increment('stock_quantity', $item->quantity);
+                Material::withTrashed()->whereKey($item->material_id)->increment('stock_quantity', $item->quantity);
             }
 
             SupplierTransaction::query()->create([
@@ -128,7 +128,7 @@ class InvoiceService
             $allowNegative = Setting::get('inventory_sale_policy', 'strict') !== 'strict';
 
             foreach ($invoice->items->where('line_type', LineType::MATERIAL) as $item) {
-                $material = Material::query()->whereKey($item->material_id)->lockForUpdate()->firstOrFail();
+                $material = Material::withTrashed()->whereKey($item->material_id)->lockForUpdate()->firstOrFail();
                 if (! $allowNegative && Money::fromDecimal($material->stock_quantity)->toCents() < Money::fromDecimal($item->quantity)->toCents()) {
                     throw new InsufficientStockException($material, $item->quantity);
                 }
@@ -173,7 +173,7 @@ class InvoiceService
                         userId: $userId
                     );
 
-                    Material::query()->whereKey($item->material_id)->decrement('stock_quantity', $item->quantity);
+                    Material::withTrashed()->whereKey($item->material_id)->decrement('stock_quantity', $item->quantity);
                 }
             }
 
@@ -238,7 +238,7 @@ class InvoiceService
                     reason: $reason,
                     userId: $userId
                 );
-                Material::query()->whereKey($item->material_id)->decrement('stock_quantity', $item->quantity);
+                Material::withTrashed()->whereKey($item->material_id)->decrement('stock_quantity', $item->quantity);
             }
 
             SupplierTransaction::query()->create([
@@ -283,7 +283,7 @@ class InvoiceService
                     reason: $reason,
                     userId: $userId
                 );
-                Material::query()->whereKey($item->material_id)->increment('stock_quantity', $item->quantity);
+                Material::withTrashed()->whereKey($item->material_id)->increment('stock_quantity', $item->quantity);
             }
 
             CustomerTransaction::query()->create([
@@ -404,9 +404,9 @@ class InvoiceService
             // enum case was always false, so a service line never inherited its
             // service's unit and printed without one.
             if ($invoice instanceof SalesInvoice && $raw['line_type'] === LineType::SERVICE->value && ! empty($raw['service_id'])) {
-                $unitId ??= Service::query()->whereKey($raw['service_id'])->value('unit_id');
+                $unitId ??= Service::withTrashed()->whereKey($raw['service_id'])->value('unit_id');
             } elseif (! empty($raw['material_id'])) {
-                $unitId ??= Material::query()->whereKey($raw['material_id'])->value('unit_id');
+                $unitId ??= Material::withTrashed()->whereKey($raw['material_id'])->value('unit_id');
             }
 
             $common = [

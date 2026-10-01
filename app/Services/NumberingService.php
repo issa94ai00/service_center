@@ -50,7 +50,7 @@ class NumberingService
         for ($attempt = 0; $attempt < 50; $attempt++) {
             $sku = $this->next('MATERIAL_SKU');
 
-            if (! Material::query()->where('sku', $sku)->exists()) {
+            if (! Material::withTrashed()->where('sku', $sku)->exists()) {
                 return $sku;
             }
         }

@@ -37,7 +37,7 @@ class SupplierPriceService
             return [];
         }
 
-        $units = Material::query()->whereIn('id', $materialIds)->pluck('unit_id', 'id');
+        $units = Material::withTrashed()->whereIn('id', $materialIds)->pluck('unit_id', 'id');
 
         $rows = DB::table('purchase_invoice_items as i')
             ->join('purchase_invoices as p', 'p.id', '=', 'i.purchase_invoice_id')

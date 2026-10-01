@@ -174,8 +174,20 @@ export const servicesApi = {
         return data;
     },
 
+    /** أرشفة: تُخفي الخدمة من القوائم والفواتير الجديدة، وتبقى في السجلّ. */
     async destroy(id) {
         const { data } = await api.delete(`/services/${id}`);
+        return data;
+    },
+
+    async restore(id) {
+        const { data } = await api.post(`/services/${id}/restore`);
+        return data;
+    },
+
+    /** حذف نهائي لخدمة مؤرشفة لم تُستخدم قط. */
+    async forceDelete(id) {
+        const { data } = await api.delete(`/services/${id}/force`);
         return data;
     },
 };
@@ -217,12 +229,17 @@ export const materialsApi = {
      * مطابقة تامّة لرمز ممسوح. تُرجع null عند عدم العثور بدل أن ترمي، فشاشة
      * البيع تتعامل مع «رمز غير معروف» كحالة عادية لا كعطل.
      */
-    async lookup(code) {
+    async lookup(code, { detail = false } = {}) {
         try {
             const { data } = await api.get('/materials/lookup', { params: { code } });
-            return data.data ?? null;
+            return detail ? { material: data.data ?? null, archived: false, message: '' } : (data.data ?? null);
         } catch (e) {
-            if (e?.response?.status === 404) return null;
+            if (e?.response?.status === 404) {
+                // detail: يميّز «رمز لمادة مؤرشفة» عن «رمز مجهول»، فلا يُعرض
+                // إنشاء مادة جديدة بباركود محجوز.
+                const body = e.response.data || {};
+                return detail ? { material: null, archived: Boolean(body.archived), message: body.message || '' } : null;
+            }
             throw e;
         }
     },
@@ -237,8 +254,20 @@ export const materialsApi = {
         return data;
     },
 
+    /** أرشفة: تُخفي المادة من القوائم والفواتير الجديدة، وتبقى في السجلّ. */
     async destroy(id) {
         const { data } = await api.delete(`/materials/${id}`);
+        return data;
+    },
+
+    async restore(id) {
+        const { data } = await api.post(`/materials/${id}/restore`);
+        return data;
+    },
+
+    /** حذف نهائي لمادة مؤرشفة لم تُستخدم قط. */
+    async forceDelete(id) {
+        const { data } = await api.delete(`/materials/${id}/force`);
         return data;
     },
 };

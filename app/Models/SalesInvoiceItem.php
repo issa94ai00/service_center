@@ -33,12 +33,12 @@ class SalesInvoiceItem extends Model
 
     public function service(): BelongsTo
     {
-        return $this->belongsTo(Service::class);
+        return $this->belongsTo(Service::class)->withTrashed();
     }
 
     public function material(): BelongsTo
     {
-        return $this->belongsTo(Material::class);
+        return $this->belongsTo(Material::class)->withTrashed();
     }
 
     public function unit(): BelongsTo

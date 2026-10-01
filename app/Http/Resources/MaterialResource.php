@@ -26,6 +26,13 @@ class MaterialResource extends JsonResource
             'is_active' => $this->is_active,
             'stock_quantity' => $this->stock_quantity,
             'is_low' => $this->isLow,
+            'archived_at' => $this->deleted_at?->toIso8601String(),
+            // Only set on archive listings, where it decides whether a
+            // permanent delete is offered.
+            'is_referenced' => $this->when(
+                array_key_exists('is_referenced', $this->getAttributes()),
+                fn () => (bool) $this->getAttributes()['is_referenced'],
+            ),
         ];
     }
 }

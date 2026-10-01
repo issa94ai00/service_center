@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\MovementDirection;
+use App\Support\CatalogRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,7 +22,7 @@ class InventoryAdjustmentRequest extends FormRequest
         return [
             'reason' => ['required', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.material_id' => ['required', 'integer', 'exists:materials,id'],
+            'items.*.material_id' => ['required', 'integer', CatalogRules::material()],
             'items.*.direction' => ['required', Rule::enum(MovementDirection::class)],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:999999999'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0', 'max:99999999999'],
@@ -38,6 +39,7 @@ class InventoryAdjustmentRequest extends FormRequest
             'reason.required' => 'سبب التسوية مطلوب.',
             'items.required' => 'يجب إضافة بند واحد على الأقل.',
             'items.*.quantity.gt' => 'الكمية يجب أن تكون أكبر من صفر.',
+            ...CatalogRules::messages(),
         ];
     }
 }

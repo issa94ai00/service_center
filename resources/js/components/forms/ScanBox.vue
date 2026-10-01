@@ -380,10 +380,19 @@ function createFromTerm() {
     emitCreate();
 }
 
-/** @returns {boolean} whether the code resolved to a material */
+/**
+ * @returns {boolean} whether the code was dealt with — a material added, or a
+ * code that belongs to an archived one, which must not be offered as "new".
+ */
 async function lookup(code) {
     try {
-        const material = await materialsApi.lookup(code);
+        const { material, archived, message } = await materialsApi.lookup(code, { detail: true });
+
+        if (archived) {
+            say(message, 'error');
+            return true;
+        }
+
         if (!material) return false;
 
         pick({

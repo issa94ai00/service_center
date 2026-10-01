@@ -11,9 +11,13 @@ import { readonly, ref } from 'vue';
 const items = ref([]);
 let seq = 0;
 
-function push(type, message, { timeout = 4000, title = '' } = {}) {
+/**
+ * `action: { label, onClick }` adds one button — "تراجع" after an archive —
+ * that runs once and closes the toast.
+ */
+function push(type, message, { timeout = 4000, title = '', action = null } = {}) {
     const id = ++seq;
-    items.value.push({ id, type, message, title });
+    items.value.push({ id, type, message, title, action });
 
     if (timeout > 0) {
         setTimeout(() => dismiss(id), timeout);

@@ -12,6 +12,7 @@
 
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 p-4">
+                <ArchiveTabs v-model="view" :archived-count="archivedCount" />
                 <input v-model.trim="search" type="search" placeholder="بحث بالاسم..."
                     class="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 <select v-model="typeFilter"
@@ -21,6 +22,10 @@
                     <option value="MANUAL">يدوية</option>
                 </select>
             </div>
+            <p v-if="archivedView" class="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-500">
+                الخدمات المؤرشفة لا تظهر في الفواتير الجديدة، وتبقى في الفواتير السابقة والتقارير.
+                الحذف النهائي متاح فقط لما لم يُستخدم في أي فاتورة.
+            </p>
             <div class="overflow-x-auto">
                 <table class="w-full text-right text-sm">
                     <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
@@ -29,32 +34,53 @@
                             <th class="px-4 py-3">النوع</th>
                             <th class="px-4 py-3">الوحدة</th>
                             <th class="px-4 py-3 text-left">السعر الافتراضي</th>
-                            <th class="px-4 py-3">الحالة</th>
+                            <th class="px-4 py-3">{{ archivedView ? 'أُرشفت' : 'الحالة' }}</th>
                             <th class="px-4 py-3">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <tr v-if="loading" class="text-slate-400"><td colspan="6" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
-                        <tr v-else-if="!items.length" class="text-slate-400"><td colspan="6" class="px-4 py-8 text-center">لا توجد نتائج</td></tr>
-                        <tr v-for="row in items" :key="row.id" class="hover:bg-slate-50">
-                            <td class="px-4 py-3 font-medium text-slate-900">{{ row.name }}</td>
+                        <tr v-else-if="!items.length" class="text-slate-400">
+                            <td colspan="6" class="px-4 py-10 text-center">
+                                <template v-if="archivedView && !search && !typeFilter">
+                                    <p class="text-2xl" aria-hidden="true">🗄️</p>
+                                    <p class="mt-1 font-medium text-slate-600">الأرشيف فارغ</p>
+                                    <p class="mt-0.5 text-xs">الخدمات التي تؤرشفها تظهر هنا، ويمكن استعادتها في أي وقت.</p>
+                                </template>
+                                <template v-else>لا توجد نتائج</template>
+                            </td>
+                        </tr>
+                        <tr v-for="row in items" :key="row.id" :class="archivedView ? 'bg-slate-50/40 text-slate-500' : 'hover:bg-slate-50'">
+                            <td class="px-4 py-3 font-medium" :class="archivedView ? 'text-slate-600' : 'text-slate-900'">{{ row.name }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ row.type === 'METER_BASED' ? 'مقاسة' : 'يدوية' }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ row.unit?.name_ar || '—' }}</td>
                             <td class="px-4 py-3 text-left font-semibold">{{ formatMoney(row.default_price) }}</td>
-                            <td class="px-4 py-3">
+                            <td v-if="archivedView" class="whitespace-nowrap px-4 py-3 text-xs">{{ formatDate(row.archived_at) }}</td>
+                            <td v-else class="px-4 py-3">
                                 <span class="rounded-full px-2 py-0.5 text-xs"
                                     :class="row.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'">
                                     {{ row.is_active ? 'نشط' : 'موقوف' }}
                                 </span>
                             </td>
                             <td class="px-4 py-3">
-                                <div class="flex items-center gap-2">
+                                <div v-if="!archivedView" class="flex items-center gap-2">
                                     <button v-if="can('services.edit')" class="text-slate-500 hover:text-slate-900" @click="openEdit(row)">تعديل</button>
                                     <button v-if="can('services.delete')"
+                                        class="text-slate-500 hover:text-amber-700 disabled:opacity-40"
+                                        :disabled="busyId === row.id"
+                                        title="إخفاء من القوائم والفواتير الجديدة — يمكن استعادتها"
+                                        @click="archiveRow(row)">
+                                        {{ busyId === row.id ? '...' : 'أرشفة' }}</button>
+                                </div>
+                                <div v-else-if="can('services.delete')" class="flex items-center gap-3">
+                                    <button class="font-medium text-blue-600 hover:text-blue-800 disabled:opacity-40"
+                                        :disabled="busyId === row.id" @click="restore(row)">
+                                        {{ busyId === row.id ? '...' : '↩ استعادة' }}</button>
+                                    <button v-if="!row.is_referenced"
                                         class="text-red-500 hover:text-red-700 disabled:opacity-40"
-                                        :disabled="deletingId === row.id"
-                                        @click="remove(row)">
-                                        {{ deletingId === row.id ? '...' : 'حذف' }}</button>
+                                        :disabled="busyId === row.id" @click="forceDelete(row)">حذف نهائي</button>
+                                    <span v-else class="cursor-help text-xs text-slate-400"
+                                        title="مستخدمة في فواتير، فتبقى في الأرشيف ليظل سجلها مقروءًا">🔒 لها سجلّ</span>
                                 </div>
                             </td>
                         </tr>
@@ -79,19 +105,18 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { servicesApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import { usePermissions } from '../../composables/usePermissions';
-import { confirm } from '../../composables/useConfirm';
-import { useToast } from '../../composables/useToast';
-import { apiMessage } from '../../utils/format';
+import { formatDate } from '../../utils/format';
+import { useCatalogArchive } from '../../composables/useCatalogArchive';
+import ArchiveTabs from '../../components/ui/ArchiveTabs.vue';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import ServiceForm from '../../components/forms/ServiceForm.vue';
 
 const { can } = usePermissions();
 const auth = useAuthStore();
-const toast = useToast();
 const items = ref([]);
 const meta = ref(null);
 const loading = ref(false);
@@ -100,8 +125,19 @@ const typeFilter = ref('');
 const page = ref(1);
 const modalOpen = ref(false);
 const editing = ref(null);
-const deletingId = ref(null);
+const view = ref('active');
+const archivedCount = ref(0);
+const archivedView = computed(() => view.value === 'archived');
 let t = null;
+
+const { busyId, archive, restore, forceDelete } = useCatalogArchive({
+    api: servicesApi,
+    noun: 'الخدمة',
+    onChange: fetchData,
+});
+
+// Resetting the page refetches through its own watcher.
+watch(view, () => { if (page.value !== 1) page.value = 1; else fetchData(); });
 
 watch([search, typeFilter], () => {
     clearTimeout(t);
@@ -115,11 +151,17 @@ async function fetchData() {
         const data = await servicesApi.index({
             search: search.value || undefined,
             type: typeFilter.value || undefined,
+            status: archivedView.value ? 'archived' : undefined,
             page: page.value,
             per_page: 15,
         });
         items.value = data.data ?? data;
         meta.value = data.meta ?? null;
+        archivedCount.value = data.counts?.archived ?? 0;
+        // The last archived row restored: nothing left to look at here.
+        if (archivedView.value && !items.value.length && archivedCount.value === 0 && page.value === 1) {
+            view.value = 'active';
+        }
     } finally {
         loading.value = false;
     }
@@ -129,28 +171,8 @@ function openCreate() { editing.value = null; modalOpen.value = true; }
 function openEdit(row) { editing.value = row; modalOpen.value = true; }
 function onSaved() { fetchData(); }
 
-async function remove(row) {
-    const ok = await confirm({
-        title: 'حذف الخدمة؟',
-        message: `سيُحذف "${row.name}" نهائيًا ولا يمكن استرجاعها.`,
-        detail: `السعر الافتراضي: ${formatMoney(row.default_price)}`,
-        confirmLabel: 'حذف نهائي',
-        tone: 'danger',
-    });
-    if (!ok) return;
-
-    deletingId.value = row.id;
-    try {
-        await servicesApi.destroy(row.id);
-        toast.success('تم حذف الخدمة');
-        fetchData();
-    } catch (e) {
-        toast.error(
-            apiMessage(e, 'تعذّر حذف هذه الخدمة — الخدمات المستخدمة في فواتير لا يمكن حذفها')
-        );
-    } finally {
-        deletingId.value = null;
-    }
+function archiveRow(row) {
+    archive(row, { detail: `السعر الافتراضي: ${formatMoney(row.default_price)}` });
 }
 
 function formatMoney(value) {

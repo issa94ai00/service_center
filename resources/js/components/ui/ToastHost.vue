@@ -24,6 +24,14 @@
                         <p class="text-sm leading-snug">{{ toast.message }}</p>
                     </div>
                     <button
+                        v-if="toast.action"
+                        type="button"
+                        class="shrink-0 rounded-lg px-2 py-0.5 text-sm font-semibold underline-offset-2 hover:underline"
+                        @click="runAction(toast)"
+                    >
+                        {{ toast.action.label }}
+                    </button>
+                    <button
                         type="button"
                         class="shrink-0 rounded p-1 opacity-50 transition hover:opacity-100"
                         aria-label="إغلاق"
@@ -41,6 +49,11 @@
 import { useToast } from '../../composables/useToast';
 
 const { toasts, dismiss } = useToast();
+
+function runAction(toast) {
+    dismiss(toast.id);
+    toast.action.onClick?.();
+}
 
 const TONES = {
     success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
