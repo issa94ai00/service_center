@@ -147,6 +147,12 @@ const routes = [
                 meta: { feature: 'technicians' },
             },
             {
+                path: 'profile',
+                name: 'profile',
+                component: () => import('../views/profile/ProfileView.vue'),
+                meta: { title: 'الملف الشخصي' },
+            },
+            {
                 path: 'roles',
                 name: 'roles',
                 component: () => import('../views/roles/RolesListView.vue'),

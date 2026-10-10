@@ -258,26 +258,40 @@
                 :class="rail ? 'px-3 py-3' : 'p-3.5'"
             >
                 <div class="flex items-center" :class="rail ? 'w-10 flex-col gap-2' : 'gap-3'">
-                    <!-- User Avatar with Initials -->
-                    <div
-                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-sm font-bold text-white shadow-sm ring-2 ring-blue-500/20"
-                        :title="auth.user?.name"
+                    <!-- Avatar + name open the profile page (account card, password, sessions) -->
+                    <RouterLink
+                        to="/profile"
+                        class="group/profile flex min-w-0 flex-1 items-center gap-3 rounded-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                        :class="[
+                            rail ? '-m-1 p-1' : '-m-1.5 p-1.5',
+                            onProfile ? 'bg-white/10' : 'hover:bg-white/10',
+                        ]"
+                        :title="rail ? 'الملف الشخصي' : 'فتح الملف الشخصي'"
+                        aria-label="الملف الشخصي"
+                        :aria-current="onProfile ? 'page' : undefined"
+                        @click="open = false"
                     >
-                        {{ initials }}
-                    </div>
+                        <!-- User Avatar with Initials -->
+                        <span
+                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-sm font-bold text-white shadow-sm ring-2 transition group-hover/profile:ring-cyan-400/60"
+                            :class="onProfile ? 'ring-cyan-400/70' : 'ring-blue-500/20'"
+                        >
+                            {{ initials }}
+                        </span>
 
-                    <!-- User Name and Role -->
-                    <div v-if="!rail" class="min-w-0 flex-1 overflow-hidden" :class="labelFade">
-                        <p class="truncate text-sm font-bold text-slate-100" :title="auth.user?.name">
-                            {{ auth.user?.name }}
-                        </p>
-                        <div class="flex items-center gap-1.5">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                            <span class="truncate text-[11px] font-medium text-cyan-300/80">
-                                {{ userRoleName }}
+                        <!-- User Name and Role -->
+                        <span v-if="!rail" class="min-w-0 flex-1 overflow-hidden" :class="labelFade">
+                            <span class="block truncate text-sm font-bold text-slate-100" :title="auth.user?.name">
+                                {{ auth.user?.name }}
                             </span>
-                        </div>
-                    </div>
+                            <span class="flex items-center gap-1.5">
+                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                                <span class="truncate text-[11px] font-medium text-cyan-300/80">
+                                    {{ userRoleName }}
+                                </span>
+                            </span>
+                        </span>
+                    </RouterLink>
 
                     <!-- Install as App Button (hidden inside the installed app) -->
                     <button
@@ -584,6 +598,8 @@ const initials = computed(() => {
     const name = auth.user?.name || '';
     return name.split(' ').slice(0, 2).map((w) => w[0]).join('');
 });
+
+const onProfile = computed(() => route.path === '/profile');
 
 const userRoleName = computed(() => {
     const roles = auth.user?.roles || [];

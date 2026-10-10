@@ -50,6 +50,11 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        /** Replace the cached user after a profile save, without a round trip. */
+        setUser(user) {
+            if (user) this.user = user;
+        },
+
         hasRole(slug) {
             return this.roles.includes(slug);
         },

@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MaterialCategoriesController;
 use App\Http\Controllers\Api\MaterialsController;
 use App\Http\Controllers\Api\PaymentsController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchasesController;
 use App\Http\Controllers\Api\RepairsController;
 use App\Http\Controllers\Api\ReportsController;
@@ -31,6 +32,16 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
+
+    // The signed-in user's own account. No permission: everyone may edit their
+    // card and password, and see which browsers hold a session for them.
+    Route::prefix('profile')->group(function () {
+        Route::get('/', [ProfileController::class, 'show']);
+        Route::put('/', [ProfileController::class, 'update']);
+        Route::put('/password', [ProfileController::class, 'updatePassword']);
+        Route::get('/sessions', [ProfileController::class, 'sessions']);
+        Route::delete('/sessions', [ProfileController::class, 'destroyOtherSessions']);
+    });
 
     Route::get('/features', [SettingsController::class, 'features']);
     // features.manage alone reaches only the feature switches (filtered in the controller).

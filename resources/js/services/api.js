@@ -18,6 +18,35 @@ export const authApi = {
     },
 };
 
+/** The signed-in user's own account — profile card, password, and open sessions. */
+export const profileApi = {
+    async show() {
+        const { data } = await api.get('/profile');
+        return data;
+    },
+
+    async update(payload) {
+        const { data } = await api.put('/profile', payload);
+        return data;
+    },
+
+    async updatePassword(payload) {
+        const { data } = await api.put('/profile/password', payload);
+        return data;
+    },
+
+    async sessions() {
+        const { data } = await api.get('/profile/sessions');
+        return data.data ?? [];
+    },
+
+    /** Ends every other session; the password is re-checked server-side. */
+    async endOtherSessions(password) {
+        const { data } = await api.delete('/profile/sessions', { data: { password } });
+        return data;
+    },
+};
+
 export const settingsApi = {
     async index() {
         const { data } = await api.get('/settings');
