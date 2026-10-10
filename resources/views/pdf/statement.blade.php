@@ -68,7 +68,7 @@
             <td colspan="2"><strong>رصيد ما قبله</strong></td>
             <td class="num">—</td>
             <td class="num">—</td>
-            <td class="num"><strong>{{ $money($statement['opening_balance']) }}</strong></td>
+            <td class="num"><strong>{{ $money($statement['opening_balance']).' '.$company['currency'] }}</strong></td>
         </tr>
         @forelse($statement['rows'] as $index => $row)
             <tr class="{{ $index % 2 ? 'zebra' : '' }}">
@@ -78,9 +78,9 @@
                     @if($row['description'])<div class="muted" style="font-size:7.5pt;">{{ $row['description'] }}</div>@endif
                 </td>
                 <td class="num">{{ $row['reference_no'] ?? '—' }}</td>
-                <td class="num">{{ (float) $row['debit'] ? $money($row['debit']) : '—' }}</td>
-                <td class="num">{{ (float) $row['credit'] ? $money($row['credit']) : '—' }}</td>
-                <td class="num">{{ $money($row['running_balance']) }}</td>
+                <td class="num">{{ (float) $row['debit'] ? $money($row['debit']).' '.$company['currency'] : '—' }}</td>
+                <td class="num">{{ (float) $row['credit'] ? $money($row['credit']).' '.$company['currency'] : '—' }}</td>
+                <td class="num">{{ $money($row['running_balance']).' '.$company['currency'] }}</td>
             </tr>
         @empty
             <tr><td colspan="6" style="text-align:center;color:#888;padding:6mm;">لا توجد حركات في الفترة المحددة</td></tr>
@@ -89,9 +89,9 @@
     <tfoot>
         <tr>
             <th colspan="3">إجمالي الفترة</th>
-            <th style="text-align:left;direction:ltr;">{{ $money($statement['totals']['debit']) }}</th>
-            <th style="text-align:left;direction:ltr;">{{ $money($statement['totals']['credit']) }}</th>
-            <th style="text-align:left;direction:ltr;">{{ $money($statement['closing_balance']) }}</th>
+            <th style="text-align:left;direction:ltr;">{{ $money($statement['totals']['debit']).' '.$company['currency'] }}</th>
+            <th style="text-align:left;direction:ltr;">{{ $money($statement['totals']['credit']).' '.$company['currency'] }}</th>
+            <th style="text-align:left;direction:ltr;">{{ $money($statement['closing_balance']).' '.$company['currency'] }}</th>
         </tr>
     </tfoot>
 </table>
@@ -101,12 +101,12 @@
         <td width="55%"></td>
         <td width="45%">
             <table class="totals" width="100%">
-                <tr><td class="label">الرصيد الافتتاحي</td><td class="value">{{ $money($statement['opening_balance']) }}</td></tr>
-                <tr><td class="label">إجمالي المدين</td><td class="value">{{ $money($statement['totals']['debit']) }}</td></tr>
-                <tr><td class="label">إجمالي الدائن</td><td class="value">{{ $money($statement['totals']['credit']) }}</td></tr>
+                <tr><td class="label">الرصيد الافتتاحي</td><td class="value">{{ $money($statement['opening_balance']).' '.$company['currency'] }}</td></tr>
+                <tr><td class="label">إجمالي المدين</td><td class="value">{{ $money($statement['totals']['debit']).' '.$company['currency'] }}</td></tr>
+                <tr><td class="label">إجمالي الدائن</td><td class="value">{{ $money($statement['totals']['credit']).' '.$company['currency'] }}</td></tr>
                 <tr class="grand">
                     <td class="label">الرصيد الختامي</td>
-                    <td class="value">{{ $money($statement['closing_balance']) }} {{ $company['currency'] }}</td>
+                    <td class="value">{{ $money($statement['closing_balance']).' '.$company['currency'] }}</td>
                 </tr>
             </table>
             <div class="muted" style="font-size:8pt;margin-top:2mm;text-align:left;">{{ $balanceHint }}</div>

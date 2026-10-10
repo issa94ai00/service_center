@@ -159,12 +159,99 @@ class SettingsTest extends TestCase
         $this->assertFalse(Setting::get('print_show_signatures'));
     }
 
+    public function test_master_user_can_login_with_credentials_and_has_master_role(): void
+    {
+        (new \Database\Seeders\SystemConfigSeeder)->run();
+        (new \Database\Seeders\AdminUserSeeder)->run();
+
+        $response = $this->postJson('/api/login', [
+            'email' => 'master@damatech.sy',
+            'password' => 'master123',
+        ])->assertOk();
+
+        $user = $response->json('user');
+        $this->assertSame('master@damatech.sy', $user['email']);
+        $roleSlugs = collect($user['roles'])->pluck('slug')->all();
+        $this->assertContains('master', $roleSlugs);
+    }
+
+    public function test_features_can_be_listed_and_toggled_on_and_off_by_master(): void
+    {
+        $this->actingAs($this->masterUser());
+
+        $features = $this->getJson('/api/features')->assertOk()->json('data');
+        $this->assertArrayHasKey('feature_repairs', $features);
+        $this->assertTrue($features['feature_repairs']);
+
+        // Toggle repairs off
+        $this->putJson('/api/settings', ['values' => [
+            'feature_repairs' => 0,
+        ]])->assertOk();
+
+        $this->assertFalse((bool) Setting::get('feature_repairs'));
+
+        $updated = $this->getJson('/api/features')->assertOk()->json('data');
+        $this->assertFalse($updated['feature_repairs']);
+
+        // Toggle repairs back on
+        $this->putJson('/api/settings', ['values' => [
+            'feature_repairs' => 1,
+        ]])->assertOk();
+
+        $this->assertTrue((bool) Setting::get('feature_repairs'));
+    }
+
+    public function test_admin_cannot_toggle_features_and_cannot_see_feature_settings(): void
+    {
+        Setting::updateOrCreate(['key' => 'feature_repairs'], [
+            'value' => '1',
+            'group' => 'features',
+            'type' => 'bool',
+        ]);
+
+        $admin = $this->userWith(['settings.manage']);
+        $this->actingAs($admin);
+
+        // Feature settings must not be included in the settings list for admin
+        $response = $this->getJson('/api/settings')->assertOk()->json('data');
+        $groups = collect($response)->pluck('group')->unique()->all();
+        $this->assertNotContains('features', $groups);
+
+        // Attempting to toggle a feature as admin fails with 422
+        $this->putJson('/api/settings', ['values' => [
+            'feature_repairs' => 0,
+        ]])->assertUnprocessable()
+            ->assertJsonValidationErrors('values');
+
+        $this->assertTrue((bool) Setting::get('feature_repairs'));
+    }
+
     public function test_it_requires_the_settings_permission(): void
     {
         $this->actingAs(User::factory()->create());
 
         $this->getJson('/api/settings')->assertForbidden();
         $this->putJson('/api/settings', ['values' => ['company_name' => 'x']])->assertForbidden();
+    }
+
+    public function test_disabled_feature_blocks_regular_user_but_master_can_access(): void
+    {
+        Setting::updateOrCreate(['key' => 'feature_repairs'], [
+            'value' => '0',
+            'group' => 'features',
+            'type' => 'bool',
+        ]);
+
+        $regularUser = $this->userWith(['repairs.view']);
+        $this->actingAs($regularUser);
+        $this->getJson('/api/repairs')->assertForbidden();
+
+        // Master user can bypass feature restriction
+        $masterUser = User::factory()->create();
+        $masterRole = Role::firstOrCreate(['slug' => 'master'], ['name' => 'المدير العام']);
+        $masterUser->roles()->attach($masterRole);
+        $this->actingAs($masterUser);
+        $this->getJson('/api/repairs')->assertOk();
     }
 
     /**
@@ -183,6 +270,15 @@ class SettingsTest extends TestCase
         }
 
         $user->roles()->attach($role);
+
+        return $user;
+    }
+
+    protected function masterUser(): User
+    {
+        $user = User::factory()->create();
+        $masterRole = Role::firstOrCreate(['slug' => 'master'], ['name' => 'المدير العام']);
+        $user->roles()->attach($masterRole);
 
         return $user;
     }

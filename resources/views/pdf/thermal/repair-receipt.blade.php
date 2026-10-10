@@ -54,8 +54,8 @@
         <td class="v">{{ $cost !== null ? $cost.' '.$company['currency'] : '—' }}</td>
     </tr>
     @if($paid)
-        <tr><td class="k">المدفوع</td><td class="v">{{ $paid }}</td></tr>
-        <tr><td class="k">{{ $dueLabel }}</td><td class="v"><strong>{{ $due }}</strong></td></tr>
+        <tr><td class="k">المدفوع</td><td class="v">{{ $paid }} {{ $company['currency'] }}</td></tr>
+        <tr><td class="k">{{ $dueLabel }}</td><td class="v"><strong>{{ $due }} {{ $company['currency'] }}</strong></td></tr>
         @if($invoiceNo)
             <tr><td class="k">رقم الفاتورة</td><td class="v ltr">{{ $invoiceNo }}</td></tr>
         @endif

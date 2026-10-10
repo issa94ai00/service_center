@@ -54,7 +54,7 @@
                     <span>{{ itemsLabel }}</span>
                     <template v-if="Number(doc.discount_amount) > 0">
                         <span aria-hidden="true">·</span>
-                        <span>بعد خصم {{ formatMoney(doc.discount_amount) }}</span>
+                        <span>بعد خصم {{ formatUsd(doc.discount_amount) }}</span>
                     </template>
                     <template v-if="doc.due_date">
                         <span aria-hidden="true">·</span>
@@ -137,7 +137,7 @@
                         class="rounded-full border px-3 py-1 text-xs transition"
                         :class="collectIsFull ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-300 text-slate-600 hover:border-blue-400 hover:text-blue-600'"
                         @click="form.collect_amount = dueNow.toFixed(2)"
-                    >دفع كامل ({{ formatMoney(dueNow) }})</button>
+                    >دفع كامل ({{ formatUsd(dueNow) }})</button>
                     <button
                         type="button"
                         class="rounded-full border px-3 py-1 text-xs transition"
@@ -146,11 +146,11 @@
                     >على الحساب</button>
                 </div>
                 <p v-if="overCollecting" class="mt-1.5 text-xs text-red-600">
-                    المبلغ أكبر من إجمالي الفاتورة ({{ formatMoney(dueNow) }}).
+                    المبلغ أكبر من إجمالي الفاتورة ({{ formatUsd(dueNow) }}).
                 </p>
                 <p v-else-if="collectAmount > 0" class="mt-1.5 text-xs text-slate-500">
                     يتبقّى على {{ doc.customer?.name || 'العميل' }}
-                    <strong class="tabular-nums text-slate-800">{{ formatMoney(leftover) }} {{ CURRENCY }}</strong>
+                    <strong class="tabular-nums text-slate-800">{{ formatUsd(leftover) }}</strong>
                     <template v-if="leftover <= 0"> — الفاتورة مسدَّدة بالكامل</template>
                 </p>
 
@@ -175,15 +175,15 @@
                 <li class="flex gap-2">
                     <span aria-hidden="true">📒</span>
                     <span>
-                        يُقيَّد <strong class="tabular-nums">{{ formatMoney(doc.total) }} {{ CURRENCY }}</strong>
+                        يُقيَّد <strong class="tabular-nums">{{ formatUsd(doc.total) }}</strong>
                         ذمّةً على {{ doc.customer?.name || 'العميل' }}<template v-if="collectAmount <= 0">، يُحصَّل بسند قبض لاحق</template>.
                     </span>
                 </li>
                 <li v-if="collectAmount > 0" class="flex gap-2">
                     <span aria-hidden="true">💵</span>
                     <span>
-                        يُسجَّل سند قبض بـ <strong class="tabular-nums">{{ formatMoney(collectAmount) }} {{ CURRENCY }}</strong>
-                        مخصَّصاً على هذه الفاتورة، فيبقى عليه {{ formatMoney(leftover) }}.
+                        يُسجَّل سند قبض بـ <strong class="tabular-nums">{{ formatUsd(collectAmount) }}</strong>
+                        مخصَّصاً على هذه الفاتورة، فيبقى عليه {{ formatUsd(leftover) }}.
                     </span>
                 </li>
                 <li class="flex gap-2 text-amber-700">
@@ -208,12 +208,13 @@
 </template>
 
 <script setup>
+import { BASE_SYMBOL } from '../../constants/currency';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import MethodPicker from '../repairs/PaymentMethodPicker.vue';
 import { salesApi } from '../../services/api';
 import { usePermissions } from '../../composables/usePermissions';
-import { apiMessage, formatDate, formatMoney, formatQty } from '../../utils/format';
+import { apiMessage, formatDate, formatMoney, formatQty, formatUsd } from '../../utils/format';
 
 const props = defineProps({
     open: Boolean,
@@ -230,7 +231,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'posted', 'stale']);
 
-const CURRENCY = 'ل.س';
+const CURRENCY = BASE_SYMBOL;
 
 const { can } = usePermissions();
 

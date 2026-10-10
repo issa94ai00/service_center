@@ -6,6 +6,7 @@ use App\Enums\DocumentStatus;
 use App\Enums\PaperSize;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentType;
+use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\PurchaseInvoice;
@@ -36,6 +37,7 @@ class DocumentPdfService
         protected StatementService $statements,
         protected RepairSettlementService $settlements,
         protected PrintSettings $printing,
+        protected CurrencyService $currencies,
     ) {}
 
     // ---------------------------------------------------------------- invoices
@@ -125,6 +127,7 @@ class DocumentPdfService
         ]);
 
         $isCustomer = $payment->payment_type === PaymentType::CUSTOMER;
+        $foreign = $this->foreignCurrency($payment);
         // A receipt taken at the maintenance counter is handed over with the
         // device still in the shop; it has to say which device, or the customer
         // holds a piece of paper that proves nothing in particular.
@@ -148,8 +151,19 @@ class DocumentPdfService
             'payment' => $payment,
             'party' => $isCustomer ? $payment->customer : $payment->supplier,
             'paymentDate' => $payment->payment_date?->format('Y-m-d'),
-            'amount' => $this->money($payment->amount),
-            'amountInWords' => ArabicNumberToWords::money($payment->amount, $company['currency_name']),
+            // Paid in SYP: the receipt states the SYP the customer handed over,
+            // and the USD it was credited as underneath.
+            'amount' => $foreign
+                ? number_format((float) $payment->currency_amount, $foreign->decimals, '.', ',')
+                : $this->money($payment->amount),
+            'amountCurrency' => $foreign?->symbol ?? $company['currency'],
+            'amountInWords' => $foreign
+                ? ArabicNumberToWords::money($payment->currency_amount, $foreign->name)
+                : ArabicNumberToWords::money($payment->amount, $company['currency_name']),
+            'baseEquivalent' => $foreign ? [
+                'amount' => $this->money($payment->amount).' '.$company['currency'],
+                'rate' => $this->rate((string) $payment->exchange_rate).' '.$foreign->symbol.' / 1 '.$company['currency'],
+            ] : null,
             'allocations' => $allocations,
             'reference' => $repair ? [
                 'label' => 'إيصال الاستلام',
@@ -361,7 +375,28 @@ class DocumentPdfService
      */
     protected function invoiceTotals($invoice): array
     {
+        // The books are in USD; a customer paying in SYP wants the figure in
+        // SYP too. Each currency flagged "show on invoices" gets a line at
+        // today's rate — for reference only, nothing is stored.
+        $remaining = (string) Money::fromDecimal($invoice->remaining)->toDecimal();
+        $hasRemaining = bccomp($remaining, '0', 2) > 0
+            && bccomp($remaining, (string) Money::fromDecimal($invoice->total)->toDecimal(), 2) !== 0;
+        $remainingIn = $this->currencies->equivalents($remaining)->keyBy('code');
+
+        $equivalents = $this->currencies
+            ->equivalents((string) Money::fromDecimal($invoice->total)->toDecimal())
+            ->map(fn (array $e) => [
+                'symbol' => $e['symbol'],
+                'name' => $e['name'],
+                'rate' => $this->rate($e['rate']),
+                'total' => number_format((float) $e['amount'], $e['decimals'], '.', ','),
+                'remaining' => $hasRemaining
+                    ? number_format((float) $remainingIn[$e['code']]['amount'], $e['decimals'], '.', ',')
+                    : null,
+            ]);
+
         return [
+            'equivalents' => $equivalents,
             'subtotal' => $this->money($invoice->subtotal),
             'discount' => $this->money($invoice->discount_amount),
             'has_discount' => (float) $invoice->discount_amount > 0,
@@ -388,9 +423,28 @@ class DocumentPdfService
             'phone' => $value('company_phone'),
             'email' => $value('company_email'),
             'tax_number' => $value('company_tax_number'),
-            'currency' => $value('currency_symbol', 'ل.س'),
-            'currency_name' => $value('currency_name', 'ليرة سورية'),
+            'currency' => $value('currency_symbol', '$'),
+            'currency_name' => $value('currency_name', 'دولار'),
         ];
+    }
+
+    /** The currency a payment was handled in, or null for plain USD. */
+    protected function foreignCurrency(Payment $payment): ?Currency
+    {
+        if (! $payment->currency_code || $payment->currency_code === Currency::BASE || $payment->currency_amount === null) {
+            return null;
+        }
+
+        return Currency::query()->where('code', $payment->currency_code)->first()
+            ?? new Currency(['code' => $payment->currency_code, 'name' => $payment->currency_code, 'symbol' => $payment->currency_code, 'decimals' => 2]);
+    }
+
+    /** 13000.000000 -> "13,000"; 0.920000 -> "0.92". */
+    protected function rate(string $rate): string
+    {
+        $formatted = number_format((float) $rate, 6, '.', ',');
+
+        return rtrim(rtrim($formatted, '0'), '.');
     }
 
     protected function money(int|float|string|null $value): string

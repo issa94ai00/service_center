@@ -38,7 +38,7 @@
         <!-- ---------------------------------------------------------- basics -->
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="grid gap-4 sm:grid-cols-6">
-                <div class="sm:col-span-4">
+                <div class="sm:col-span-6 xl:col-span-4">
                     <Field :label="partyLabel" required>
                         <!-- العملاء والموردون يمرّون عبر منتقي بحث: قوائمهم هي التي
                              تطول. خبراء الصيانة يبقون عدداً محدوداً فتكفيهم قائمة. -->
@@ -75,26 +75,18 @@
                     </Field>
                 </div>
 
-                <div class="sm:col-span-2">
+                <div class="sm:col-span-6 xl:col-span-2">
                     <Field label="المبلغ" required>
-                        <div class="relative">
-                            <input
-                                ref="amountInput"
-                                v-model="form.amount"
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                inputmode="decimal"
-                                placeholder="0.00"
-                                class="w-full rounded-lg border px-3 py-2 pe-14 text-lg font-bold tabular-nums focus:outline-none focus:ring-2"
-                                :class="errors.amount ? INVALID_FIELD : VALID_FIELD"
-                                @input="amountTouched = Boolean($event.target.value)"
-                            />
-                            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-slate-400">
-                                {{ CURRENCY }}
-                            </span>
-                        </div>
-                        <p v-if="errors.amount" class="mt-1 text-xs text-red-600">{{ errors.amount }}</p>
+                        <CurrencyAmountField
+                            ref="amountInput"
+                            v-model:amount="form.amount"
+                            v-model:currency-code="form.currency_code"
+                            v-model:currency-amount="form.currency_amount"
+                            v-model:exchange-rate="form.exchange_rate"
+                            :invalid="Boolean(amountError)"
+                            @typed="amountTouched = $event"
+                        />
+                        <p v-if="amountError" class="mt-1 text-xs text-red-600">{{ amountError }}</p>
                     </Field>
                 </div>
 
@@ -186,7 +178,8 @@
                         </h2>
                         <p class="mt-0.5 text-xs text-slate-500">
                             {{ isIncoming ? 'فواتير بيع' : 'فواتير شراء' }} غير مسدّدة، الأقدم أولاً — يجب أن يساوي
-                            المخصَّص مبلغ السند كاملاً
+                            المخصَّص مبلغ السند كاملاً<template v-if="isForeignCurrency">
+                            — الفواتير بالدولار، فيُخصَّص ما يعادله ({{ formatMoney(amountValue) }} {{ CURRENCY }})</template>
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -444,13 +437,17 @@
         <div v-if="error" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ error }}</div>
 
         <!-- شريط ملتصق: المبلغ والحفظ يبقيان في المتناول مهما طالت قائمة الفواتير -->
-        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:ps-64">
+        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:ps-[var(--sidebar-w,16rem)]">
             <div class="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div class="text-sm">
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-500">
                         <span>
                             {{ isIncoming ? 'مقبوض' : 'مدفوع' }}
-                            <b class="tabular-nums text-slate-900">{{ formatMoney(amountValue) }} {{ CURRENCY }}</b>
+                            <b v-if="isForeignCurrency" class="tabular-nums text-slate-900">
+                                {{ formatIn(form.currency_amount || 0, selectedCurrency) }}
+                                <span class="font-normal text-slate-500">= {{ formatMoney(amountValue) }} {{ CURRENCY }}</span>
+                            </b>
+                            <b v-else class="tabular-nums text-slate-900">{{ formatMoney(amountValue) }} {{ CURRENCY }}</b>
                         </span>
                         <span v-if="!isTechnician && remainingCents !== 0" :class="remainingCents > 0 ? 'text-amber-700' : 'text-red-600'">
                             {{ remainingCents > 0 ? 'بلا تخصيص' : 'زيادة' }}
@@ -489,6 +486,9 @@ import EmptyState from '../../components/ui/EmptyState.vue';
 import TableSkeleton from '../../components/ui/TableSkeleton.vue';
 import CustomerSelect from '../../components/forms/CustomerSelect.vue';
 import SupplierSelect from '../../components/forms/SupplierSelect.vue';
+import CurrencyAmountField from '../../components/forms/CurrencyAmountField.vue';
+import { formatIn, useCurrencies } from '../../composables/useCurrencies';
+import { BASE_SYMBOL } from '../../constants/currency';
 import { paymentsApi, salesApi, techniciansApi } from '../../services/api';
 import { useToast } from '../../composables/useToast';
 import { PAYMENT_METHODS } from '../../constants/paymentMethods';
@@ -506,7 +506,7 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
-const CURRENCY = 'ل.س';
+const CURRENCY = BASE_SYMBOL;
 const VALID_FIELD = 'border-slate-300 focus:border-blue-500 focus:ring-blue-100';
 const INVALID_FIELD = 'border-red-300 focus:border-red-500 focus:ring-red-100';
 
@@ -524,11 +524,23 @@ const form = reactive({
     payment_type: typeFromQuery,
     party_id: '',
     amount: '',
+    // `amount` stays USD — allocations and the ledger use it. A receipt in
+    // another currency also carries what was handed over and at what rate.
+    currency_code: 'USD',
+    currency_amount: '',
+    exchange_rate: '1',
     payment_method: 'CASH',
     reference_no: '',
     payment_date: isoDate(),
     notes: '',
 });
+
+const currencyStore = useCurrencies();
+const selectedCurrency = computed(() => currencyStore.find(form.currency_code));
+const isForeignCurrency = computed(() => form.currency_code !== 'USD');
+const amountError = computed(
+    () => errors.value.amount || errors.value.currency_amount || errors.value.exchange_rate || errors.value.currency_code || ''
+);
 
 const parties = ref([]);
 const loadedParty = ref(null);
@@ -872,7 +884,7 @@ watch(() => form.payment_type, () => {
 watch(() => form.amount, () => {
     if (hydrating.value) return;
 
-    errors.value = { ...errors.value, amount: undefined };
+    errors.value = { ...errors.value, amount: undefined, currency_amount: undefined, exchange_rate: undefined };
     if (!allocTouched.value) distributeFromAmount();
 });
 
@@ -905,6 +917,10 @@ function payload() {
         supplier_id: form.payment_type === 'SUPPLIER' ? Number(form.party_id) : undefined,
         technician_id: isTechnician.value ? Number(form.party_id) : undefined,
         amount: fromCents(amountCents.value),
+        currency_code: form.currency_code,
+        ...(isForeignCurrency.value
+            ? { currency_amount: form.currency_amount, exchange_rate: form.exchange_rate }
+            : {}),
         payment_method: form.payment_method,
         reference_no: form.reference_no || null,
         payment_date: form.payment_date,
@@ -946,6 +962,13 @@ async function submit() {
     } catch (e) {
         error.value = apiMessage(e, 'تعذّر الحفظ');
         errors.value = apiFieldErrors(e);
+
+        // A business rule names its field without a 422 bag (the rate moved,
+        // the currency was switched off): mark the amount, and re-read the
+        // rates so "سعر اليوم" offers the new one.
+        const field = e?.response?.data?.field;
+        if (field) errors.value = { ...errors.value, [field]: error.value };
+        if (field === 'exchange_rate' || field === 'currency_code') currencyStore.refresh();
     } finally {
         saving.value = false;
     }
@@ -971,6 +994,9 @@ onMounted(async () => {
         form.payment_type = payment.payment_type;
         form.party_id = payment.customer_id ?? payment.supplier_id ?? payment.technician_id ?? '';
         form.amount = payment.amount;
+        form.currency_code = payment.currency_code || 'USD';
+        form.currency_amount = form.currency_code === 'USD' ? '' : payment.currency_amount;
+        form.exchange_rate = payment.exchange_rate || '1';
         form.payment_method = payment.payment_method;
         form.reference_no = payment.reference_no || '';
         form.payment_date = payment.payment_date;

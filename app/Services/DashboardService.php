@@ -4,13 +4,17 @@ namespace App\Services;
 
 use App\Enums\DocumentStatus;
 use App\Enums\PaymentType;
+use App\Enums\RepairStatus;
 use App\Models\Expense;
 use App\Models\Material;
 use App\Models\Payment;
 use App\Models\PurchaseInvoice;
+use App\Models\Repair;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
+use App\Models\User;
 use App\Support\DateRange;
+use App\Support\Features;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,9 +39,14 @@ class DashboardService
     public function __construct(protected ReportService $reports) {}
 
     /**
+     * The repair, technician and service sections are built only for a $user who may
+     * see that module (its view permission, with its feature switched on), so the
+     * payload never carries figures the screen would have to hide. Without a $user
+     * every section is built.
+     *
      * @return array<string, mixed>
      */
-    public function build(?string $from = null, ?string $to = null, bool $compare = false): array
+    public function build(?string $from = null, ?string $to = null, bool $compare = false, ?User $user = null): array
     {
         $today = CarbonImmutable::today();
         $start = $from ? CarbonImmutable::parse($from) : $today->startOfMonth();
@@ -47,20 +56,46 @@ class DashboardService
         $toDate = $end->format('Y-m-d');
         $days = (int) $start->diffInDays($end) + 1;
 
+        $sections = $this->sections($user);
+        $profit = $this->reports->profitSummary($fromDate, $toDate);
+
         return [
             'period' => [
                 'from' => $fromDate,
                 'to' => $toDate,
                 'days' => $days,
             ],
+            'sections' => $sections,
             'kpis' => $this->kpis($fromDate, $toDate, $today->format('Y-m-d')),
-            'alerts' => $this->alerts(),
+            'alerts' => $this->alerts($sections['repairs']),
             'trend' => $this->trend($start, $end),
             'top_customers' => $this->topCustomers($fromDate, $toDate),
             'top_materials' => $this->topMaterials($fromDate, $toDate),
+            'top_repair_brands' => $sections['repairs'] ? $this->topRepairBrands($fromDate, $toDate) : null,
+            'workshop' => $sections['repairs'] ? $this->workshopSummary($fromDate, $toDate) : null,
+            'top_technicians' => $sections['technicians'] ? $this->topTechnicians($fromDate, $toDate) : null,
+            'top_services' => $sections['services'] ? $this->topServices($profit) : null,
+            'profit_overview' => $this->profitOverview($profit),
             'low_stock' => $this->reports->lowStock()->take(self::SHORTLIST_SIZE)->values(),
             'recent_documents' => $this->recentDocuments(),
             'comparison' => $compare ? $this->comparison($start, $days) : null,
+        ];
+    }
+
+    /**
+     * Which module sections $user may see on the dashboard.
+     *
+     * @return array{repairs: bool, technicians: bool, services: bool}
+     */
+    protected function sections(?User $user): array
+    {
+        // A switched-off module leaves the dashboard even for Master, who can still open it
+        // from its own page. Technicians are paid from repairs, so they need both switches.
+        return [
+            'repairs' => Features::on('repairs') && ($user?->hasPermission('repairs.view') ?? true),
+            'technicians' => Features::on('repairs') && Features::on('technicians')
+                && ($user?->hasPermission('technicians.view') ?? true),
+            'services' => Features::on('services') && ($user?->hasPermission('services.view') ?? true),
         ];
     }
 
@@ -202,7 +237,7 @@ class DashboardService
      *
      * @return array<string, int>
      */
-    protected function alerts(): array
+    protected function alerts(bool $withRepairs = true): array
     {
         $lowStock = Material::query()
             ->where('is_active', true)
@@ -211,12 +246,26 @@ class DashboardService
             ->selectRaw('SUM(CASE WHEN stock_quantity <= 0 THEN 1 ELSE 0 END) as depleted')
             ->first();
 
-        return [
+        $alerts = [
             'draft_sales' => SalesInvoice::query()->where('status', DocumentStatus::DRAFT)->count(),
             'draft_purchases' => PurchaseInvoice::query()->where('status', DocumentStatus::DRAFT)->count(),
             'draft_payments' => Payment::query()->where('status', DocumentStatus::DRAFT)->count(),
             'low_stock' => (int) ($lowStock?->low ?? 0),
             'out_of_stock' => (int) ($lowStock?->depleted ?? 0),
+        ];
+
+        if (! $withRepairs) {
+            return $alerts;
+        }
+
+        return $alerts + [
+            'repairs_ready' => Repair::query()->where('status', RepairStatus::READY)->count(),
+            'repairs_waiting_approval' => Repair::query()->where('status', RepairStatus::WAITING_APPROVAL)->count(),
+            'repairs_in_progress' => Repair::query()->whereIn('status', [
+                RepairStatus::RECEIVED,
+                RepairStatus::DIAGNOSING,
+                RepairStatus::UNDER_REPAIR,
+            ])->count(),
         ];
     }
 
@@ -454,5 +503,118 @@ class DashboardService
             ->sortByDesc('date')
             ->take(self::RECENT_SIZE)
             ->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function topRepairBrands(string $from, string $to): Collection
+    {
+        return Repair::query()
+            ->whereBetween('received_at', DateRange::between($from, $to))
+            ->whereNotNull('brand')
+            ->where('brand', '!=', '')
+            ->groupBy('brand')
+            ->selectRaw('brand, COUNT(*) as count')
+            ->orderByDesc('count')
+            ->limit(self::SHORTLIST_SIZE)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => (string) $row->brand,
+                'count' => (int) $row->count,
+            ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function workshopSummary(string $from, string $to): array
+    {
+        $received = Repair::query()
+            ->whereBetween('received_at', DateRange::between($from, $to))
+            ->count();
+
+        $delivered = Repair::query()
+            ->where('status', RepairStatus::DELIVERED)
+            ->whereBetween('delivered_at', DateRange::between($from, $to))
+            ->selectRaw('COUNT(*) as total_count, COALESCE(SUM(final_cost), 0) as total_amount')
+            ->first();
+
+        $activeCount = Repair::query()
+            ->whereNotIn('status', [RepairStatus::DELIVERED, RepairStatus::CANCELLED])
+            ->count();
+
+        $readyCount = Repair::query()
+            ->where('status', RepairStatus::READY)
+            ->count();
+
+        $waitingApprovalCount = Repair::query()
+            ->where('status', RepairStatus::WAITING_APPROVAL)
+            ->count();
+
+        return [
+            'received_count' => $received,
+            'delivered_count' => (int) ($delivered?->total_count ?? 0),
+            'delivered_revenue' => Money::fromDecimal($delivered?->total_amount ?? 0)->toDecimal(),
+            'active_in_shop' => $activeCount,
+            'ready_for_pickup' => $readyCount,
+            'waiting_approval' => $waitingApprovalCount,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary  ReportService::profitSummary() for the period
+     * @return array<string, mixed>
+     */
+    protected function profitOverview(array $summary): array
+    {
+        return [
+            'revenue' => $summary['revenue']['total'],
+            'cogs' => $summary['cogs']['total'],
+            'gross_profit' => $summary['gross_profit']['total'],
+            'gross_margin' => $summary['gross_profit']['margin_percent'],
+            'operating_expenses' => $summary['operating_expenses']['total'],
+            'technician_commissions' => $summary['technician_commissions']['total'],
+            'operating_costs' => $summary['operating_costs']['total'],
+            'net_profit' => $summary['net_profit']['total'],
+            'net_margin' => $summary['net_profit']['margin_percent'],
+            'is_loss' => $summary['net_profit']['is_loss'],
+            'net_cash_flow' => $summary['cash_flow']['net_cash_flow'],
+        ];
+    }
+
+    /**
+     * Technicians ranked by commission earned in the period, with what the shop still
+     * owes all active technicians (positive = owed to them), as the technicians report.
+     *
+     * @return array<string, mixed>
+     */
+    protected function topTechnicians(string $from, string $to): array
+    {
+        $summary = $this->reports->technicianSummary([
+            'from' => $from,
+            'to' => $to,
+            'only_active' => true,
+            'per_page' => self::SHORTLIST_SIZE,
+        ]);
+
+        return [
+            'rows' => $summary['rows']
+                ->filter(fn (array $row) => $row['repairs_count'] > 0 || (float) $row['commission'] != 0.0)
+                ->map(fn (array $row) => collect($row)->only(['id', 'name', 'repairs_count', 'revenue', 'commission'])->all())
+                ->values(),
+            'balance_owed' => $summary['totals']['balance'],
+        ];
+    }
+
+    /**
+     * The best-selling services of the period, from the profit summary already built.
+     *
+     * @param  array<string, mixed>  $profit  ReportService::profitSummary() for the period
+     * @return array<int, array<string, mixed>>
+     */
+    protected function topServices(array $profit): array
+    {
+        return array_slice($profit['top_services'], 0, self::SHORTLIST_SIZE);
     }
 }

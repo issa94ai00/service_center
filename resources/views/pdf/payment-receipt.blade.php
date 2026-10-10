@@ -26,7 +26,10 @@
             <table width="100%">
                 <tr><td class="label">التاريخ</td><td class="ltr" style="text-align:right;">{{ $paymentDate }}</td></tr>
                 <tr><td class="label">طريقة الدفع</td><td>{{ $labels['method'] }}</td></tr>
-                <tr><td class="label">العملة</td><td>{{ $company['currency'] }}</td></tr>
+                <tr><td class="label">العملة</td><td>{{ $amountCurrency }}</td></tr>
+                @if($baseEquivalent)
+                    <tr><td class="label">سعر الصرف</td><td class="ltr" style="text-align:right;">{{ $baseEquivalent['rate'] }}</td></tr>
+                @endif
                 {{-- سند قبض على بلاغ صيانة: الجهاز ما زال في المحل، فالسند
                      يسمّيه ويحمل رقم إيصال استلامه. --}}
                 @if(!empty($reference))
@@ -44,9 +47,15 @@
     <tr>
         <th width="30%">{{ $labels['amount_label'] }}</th>
         <td style="font-size:14pt;font-weight:bold;direction:ltr;text-align:left;">
-            {{ $amount }} {{ $company['currency'] }}
+            {{ $amount }} {{ $amountCurrency }}
         </td>
     </tr>
+    @if($baseEquivalent)
+        <tr>
+            <th>يعادل</th>
+            <td style="direction:ltr;text-align:left;">{{ $baseEquivalent['amount'] }}</td>
+        </tr>
+    @endif
     <tr>
         <th>المبلغ كتابةً</th>
         <td>{{ $amountInWords }}</td>
@@ -70,7 +79,7 @@
                     <td class="num">{{ $index + 1 }}</td>
                     <td class="num">{{ $allocation['invoice_no'] }}</td>
                     <td class="num">{{ $allocation['invoice_date'] }}</td>
-                    <td class="num">{{ $allocation['amount'] }}</td>
+                    <td class="num">{{ $allocation['amount'] }} {{ $company['currency'] }}</td>
                 </tr>
             @endforeach
         </tbody>

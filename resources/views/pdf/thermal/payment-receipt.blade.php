@@ -24,7 +24,10 @@
 
 <div class="amount-box">
     <div class="small">{{ $labels['amount_label'] }}</div>
-    <div class="amount">{{ $amount }} {{ $company['currency'] }}</div>
+    <div class="amount">{{ $amount }} {{ $amountCurrency }}</div>
+    @if($baseEquivalent)
+        <div class="small">يعادل {{ $baseEquivalent['amount'] }} — سعر الصرف {{ $baseEquivalent['rate'] }}</div>
+    @endif
 </div>
 <div class="small center">{{ $amountInWords }}</div>
 
@@ -35,7 +38,7 @@
         @foreach($allocations as $allocation)
             <tr>
                 <td class="ltr" style="text-align:right;">{{ $allocation['invoice_no'] }}</td>
-                <td class="num">{{ $allocation['amount'] }}</td>
+                <td class="num">{{ $allocation['amount'] }} {{ $company['currency'] }}</td>
             </tr>
         @endforeach
     </table>

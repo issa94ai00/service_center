@@ -43,7 +43,7 @@
                 :aria-activedescendant="activeId"
                 autocomplete="off"
                 :placeholder="labels.searchPlaceholder"
-                class="w-full rounded-lg border py-2 pr-9 ps-9 text-sm focus:outline-none focus:ring-2"
+                class="w-full rounded-lg border py-2 pr-9 pl-12 text-sm focus:outline-none focus:ring-2"
                 :class="invalid
                     ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
                     : 'border-slate-300 focus:border-blue-500 focus:ring-blue-100'"

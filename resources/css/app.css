@@ -21,3 +21,20 @@
         @apply bg-slate-50 text-slate-900 antialiased;
     }
 }
+/* Phones and tablets */
+@layer base {
+    /* iOS Safari zooms the page when a field under 16px is focused. */
+    @media (max-width: 639px) and (pointer: coarse) {
+        input:not([type='checkbox']):not([type='radio']):not([type='range']),
+        select,
+        textarea {
+            font-size: 16px;
+        }
+    }
+
+    /* A scrolling table keeps its column headings on one line instead of
+       squeezing them into tall stacks before the scroll kicks in. */
+    .overflow-x-auto > table > thead th {
+        white-space: nowrap;
+    }
+}

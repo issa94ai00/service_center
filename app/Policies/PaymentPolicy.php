@@ -12,7 +12,7 @@ class PaymentPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->allows($user, 'payments.create') || $user->hasPermission('statements.view');
+        return $this->allows($user, 'payments.view') || $user->hasPermission('statements.view');
     }
 
     public function view(User $user, Payment $payment): bool

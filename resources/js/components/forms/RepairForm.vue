@@ -396,6 +396,7 @@
 </template>
 
 <script setup>
+import { BASE_SYMBOL } from '../../constants/currency';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import Field from '../ui/FormField.vue';
 import CustomerSelect from './CustomerSelect.vue';
@@ -410,7 +411,7 @@ import { apiFieldErrors, apiMessage, formatMoney, formatPercent, nowLocalInput, 
 
 const props = defineProps({
     repair: { type: Object, default: null },
-    currency: { type: String, default: 'ل.س' },
+    currency: { type: String, default: BASE_SYMBOL },
 });
 
 const emit = defineEmits(['close', 'saved']);

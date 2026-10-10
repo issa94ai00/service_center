@@ -405,6 +405,7 @@
 </template>
 
 <script setup>
+import { BASE_SYMBOL } from '../../constants/currency';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import Field from '../ui/FormField.vue';
@@ -454,7 +455,7 @@ let lineSeq = 0;
 const form = reactive({ total: '', collect_amount: '', payment_method: 'CASH', commission_rate: '' });
 const collectForm = reactive({ amount: '', payment_method: 'CASH' });
 
-const currency = computed(() => summary.value?.currency ?? 'ل.س');
+const currency = computed(() => summary.value?.currency ?? BASE_SYMBOL);
 const settled = computed(() => Boolean(summary.value?.is_settled));
 const paid = computed(() => Number(summary.value?.paid ?? 0));
 

@@ -15,7 +15,7 @@
                 aria-modal="true"
                 @click.self="reject"
             >
-                <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                <div class="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
                     <div class="flex items-start gap-4">
                         <span
                             class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl"

@@ -36,7 +36,7 @@
             </table>
         </div>
 
-        <div v-else ref="wrapper" class="relative w-full" dir="ltr">
+        <div v-else ref="wrapper" class="relative w-full overflow-hidden" dir="ltr" style="touch-action: pan-y">
             <svg
                 :width="width"
                 :height="height"
@@ -162,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
     points: { type: Array, default: () => [] },
@@ -183,9 +183,16 @@ let observer = null;
 onMounted(() => {
     if (!wrapper.value || typeof ResizeObserver === 'undefined') return;
     observer = new ResizeObserver(([entry]) => {
-        width.value = Math.max(320, Math.floor(entry.contentRect.width));
+        width.value = Math.max(240, Math.floor(entry.contentRect.width));
     });
     observer.observe(wrapper.value);
+});
+
+// The wrapper is re-created after toggling the table view; keep observing the live one.
+watch(wrapper, (el, old) => {
+    if (!observer) return;
+    if (old) observer.unobserve(old);
+    if (el) observer.observe(el);
 });
 
 onBeforeUnmount(() => observer?.disconnect());
@@ -228,7 +235,8 @@ const xTicks = computed(() => {
     const total = props.points.length;
     if (!total) return [];
     // Cap the label count so dense periods do not collide.
-    const step = Math.max(1, Math.ceil(total / 8));
+    const maxLabels = Math.max(2, Math.min(8, Math.floor(plotWidth.value / 56)));
+    const step = Math.max(1, Math.ceil(total / maxLabels));
     const ticks = [];
     for (let i = 0; i < total; i += step) {
         ticks.push({ index: i, x: xFor(i), label: props.points[i].label });
@@ -245,7 +253,7 @@ const tooltipStyle = computed(() => {
     // Flip the tooltip to the other side near the right edge.
     const flip = x > width.value - 160;
     return {
-        left: `${flip ? x - 150 : x + 14}px`,
+        left: `${Math.min(Math.max(0, flip ? x - 150 : x + 14), Math.max(0, width.value - 150))}px`,
         top: `${pad.top}px`,
     };
 });

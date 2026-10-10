@@ -15,7 +15,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ExpenseService
 {
-    public function __construct(private readonly NumberingService $numbers) {}
+    public function __construct(
+        private readonly NumberingService $numbers,
+        private readonly CurrencyService $currencies,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -26,6 +29,7 @@ class ExpenseService
             /** @var Expense $expense */
             $expense = Expense::query()->create([
                 ...$this->payload($data),
+                ...$this->currencies->resolve($data),
                 'expense_no' => $this->numbers->next('EXPENSE'),
                 'status' => Expense::POSTED,
                 'recorded_by' => $userId,
@@ -49,7 +53,10 @@ class ExpenseService
             throw new BusinessRuleException(__('المصروف الملغى لا يُعدَّل.'));
         }
 
-        $expense->fill($this->payload($data, partial: true));
+        $expense->fill([
+            ...$this->payload($data, partial: true),
+            ...$this->currencies->resolve($data, $expense),
+        ]);
         $expense->save();
 
         return $expense->fresh();

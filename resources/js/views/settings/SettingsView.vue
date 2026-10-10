@@ -13,16 +13,25 @@
 
         <form v-else class="space-y-5" @submit.prevent="save">
             <section v-for="group in groups" :key="group.key" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="mb-4 flex items-center gap-3">
-                    <span
-                        class="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl text-lg"
-                        :class="groupChip(group.key)"
-                        aria-hidden="true"
-                    >{{ groupIcons[group.key] || '⚙️' }}</span>
-                    <div>
-                        <h2 class="font-bold text-slate-900">{{ group.label }}</h2>
-                        <p class="text-xs text-slate-500">{{ group.hint }}</p>
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl text-lg"
+                            :class="groupChip(group.key)"
+                            aria-hidden="true"
+                        >{{ groupIcons[group.key] || '⚙️' }}</span>
+                        <div>
+                            <h2 class="font-bold text-slate-900">{{ group.label }}</h2>
+                            <p class="text-xs text-slate-500">{{ group.hint }}</p>
+                        </div>
                     </div>
+                    <span
+                        v-if="group.key === 'features'"
+                        class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-300"
+                    >
+                        <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+                        صلاحية المدير العام (Master)
+                    </span>
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -122,6 +131,8 @@ import { settingsApi } from '../../services/api';
 import { confirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import { usePrintPreferences } from '../../composables/usePrintPreferences';
+import { useAuthStore } from '../../stores/auth';
+import { useFeaturesStore } from '../../stores/features';
 import PrintSettingsSection from '../../components/print/PrintSettingsSection.vue';
 
 // Presentation for each known key. Unknown keys still render, labelled by key,
@@ -132,9 +143,9 @@ const meta = {
     company_phone: { label: 'الهاتف', ltr: true, placeholder: '011...' },
     company_email: { label: 'البريد الإلكتروني', ltr: true, placeholder: 'info@example.com' },
     company_tax_number: { label: 'الرقم الضريبي', ltr: true },
-    currency_name: { label: 'اسم العملة', required: true, hint: 'يُستخدم في تفقيط المبالغ على السندات' },
-    currency_symbol: { label: 'رمز العملة', required: true, hint: 'يظهر بجانب المبالغ' },
-    currency_code: { label: 'كود العملة', ltr: true, hint: 'مثل SYP' },
+    currency_name: { label: 'اسم العملة الأساسية', required: true, hint: 'يُستخدم في تفقيط المبالغ على السندات' },
+    currency_symbol: { label: 'رمز العملة الأساسية', required: true, hint: 'الدفاتر بالدولار — العملات الأخرى من شاشة «العملات وأسعار الصرف»' },
+    currency_code: { label: 'كود العملة الأساسية', ltr: true, hint: 'ثابت: USD' },
     allow_overpayment: {
         label: 'السماح بالدفع الزائد',
         on: 'اسمح بدفعة تتجاوز رصيد الفاتورة',
@@ -178,19 +189,74 @@ const meta = {
         placeholder: 'M-',
         hint: 'تُستخدم حين تُضاف مادة جديدة بلا رمز — مثل الإضافة السريعة من فاتورة الشراء',
     },
+
+    // System features toggles (Master / features.manage)
+    feature_repairs: {
+        label: 'قسم الصيانة والأجهزة (Repairs)',
+        hint: 'إدارة أجهزة وبطاقات وإيصالات وفواتير وتسوية الصيانة',
+        on: 'مفعّل في النظام',
+    },
+    feature_technicians: {
+        label: 'خبراء وفنيو الصيانة (Technicians)',
+        hint: 'إدارة الفنيين وحساب نسب أجور الصيانة وكشوفات الحساب',
+        on: 'مفعّل في النظام',
+    },
+    feature_purchases: {
+        label: 'فواتير الشراء (Purchases)',
+        hint: 'إدارة فواتير الشراء وعمليات التوريد واقتراح الأسعار',
+        on: 'مفعّل في النظام',
+    },
+    feature_expenses: {
+        label: 'سندات المصاريف (Expenses)',
+        hint: 'إدارة مصاريف الصندوق من إيجارات وفواتير ونثريات',
+        on: 'مفعّل في النظام',
+    },
+    feature_reports: {
+        label: 'التقارير المالية والأرباح (Reports)',
+        hint: 'عرض تقارير الأرباح والخسائر والتدفقات والمؤشرات المالية',
+        on: 'مفعّل في النظام',
+    },
+    feature_services: {
+        label: 'دليل الخدمات ووحدات القياس (Services & Units)',
+        hint: 'إدارة الخدمات المقدمة ووحدات القياس المعتمدة',
+        on: 'مفعّل في النظام',
+    },
+    feature_inventory: {
+        label: 'المخزون والجرد (Inventory)',
+        hint: 'إدارة تسويات ومطابقة كميات المخزون وحركات المستودع',
+        on: 'مفعّل في النظام',
+    },
+    feature_sales: {
+        label: 'فواتير البيع (Sales)',
+        hint: 'إدارة فواتير بيع المواد والخدمات للعملاء',
+        on: 'مفعّل في النظام',
+    },
 };
 
 const groupMeta = {
     general: { label: 'بيانات الشركة والعملة', hint: 'تظهر على المستندات المطبوعة' },
     financial: { label: 'السياسات المالية والمخزون', hint: 'تحكم قواعد الترحيل والدفع' },
     numbers: { label: 'ترقيم المستندات', hint: 'تُطبّق على المستندات الجديدة فقط — الأرقام المُصدرة لا تتغيّر' },
+    features: {
+        label: 'ميزات ووحدات النظام (System Features)',
+        hint: 'تمكين أو تعطيل الوحدات والوظائف الرئيسية للنظام (خاص بالمدير العام Master)',
+    },
 };
 
-const groupIcons = { general: '🏢', financial: '⚖️', numbers: '🔢' };
+const groupIcons = { general: '🏢', financial: '⚖️', numbers: '🔢', features: '⚡' };
 
 function groupChip(key) {
-    return { general: 'bg-blue-100', financial: 'bg-violet-100', numbers: 'bg-cyan-100' }[key] || 'bg-slate-100';
+    return {
+        general: 'bg-blue-100',
+        financial: 'bg-violet-100',
+        numbers: 'bg-cyan-100',
+        features: 'bg-amber-100 text-amber-700',
+    }[key] || 'bg-slate-100';
 }
+
+const auth = useAuthStore();
+const featuresStore = useFeaturesStore();
+const canManageFeatures = computed(() => auth.hasPermission('features.manage'));
 
 const settings = ref([]);
 const values = reactive({});
@@ -209,11 +275,12 @@ const CUSTOM_GROUPS = ['print'];
 const hasPrintSettings = computed(() => settings.value.some((s) => s.group === 'print'));
 
 const groups = computed(() => {
-    const order = ['general', 'financial', 'numbers'];
+    const order = ['general', 'financial', 'numbers', 'features'];
     const byGroup = {};
 
     for (const setting of settings.value) {
         if (CUSTOM_GROUPS.includes(setting.group)) continue;
+        if (setting.group === 'features' && !canManageFeatures.value) continue;
         (byGroup[setting.group] ??= []).push(setting);
     }
 
@@ -276,6 +343,7 @@ async function save() {
         // Booleans go over the wire as 1/0 so they store as "1"/"0".
         const payload = {};
         for (const setting of settings.value) {
+            if (setting.group === 'features' && !canManageFeatures.value) continue;
             payload[setting.key] = setting.type === 'bool'
                 ? (values[setting.key] ? 1 : 0)
                 : values[setting.key];
@@ -283,6 +351,20 @@ async function save() {
 
         const response = await settingsApi.update(payload);
         hydrate(response.data ?? []);
+
+        // Sync features store
+        if (canManageFeatures.value) {
+            const featMap = {};
+            for (const s of (response.data ?? [])) {
+                if (s.group === 'features') {
+                    featMap[s.key] = s.value === '1' || s.value === 1 || s.value === true;
+                }
+            }
+            if (Object.keys(featMap).length) {
+                featuresStore.setFeatures(featMap);
+            }
+        }
+
         // Print buttons cache the shop defaults; let them see the new ones.
         printPreferences.refresh();
 

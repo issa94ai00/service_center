@@ -4,19 +4,25 @@ namespace Tests\Feature;
 
 use App\Enums\DocumentStatus;
 use App\Enums\PaymentType;
+use App\Enums\RepairStatus;
 use App\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\CustomerTransaction;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Material;
 use App\Models\MaterialCategory;
 use App\Models\Payment;
 use App\Models\Permission;
 use App\Models\PurchaseInvoice;
+use App\Models\Repair;
 use App\Models\Role;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
 use App\Models\ServiceUnit;
+use App\Models\Setting;
 use App\Models\Supplier;
+use App\Models\Technician;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -342,6 +348,183 @@ class DashboardTest extends TestCase
             ->assertJsonValidationErrors('to');
     }
 
+    public function test_it_reports_workshop_metrics_and_alerts(): void
+    {
+        Repair::query()->create([
+            'customer_id' => $this->customer->id,
+            'device_type' => 'هاتف',
+            'brand' => 'Apple',
+            'model' => 'iPhone 13',
+            'reported_issue' => 'كسر شاشة',
+            'status' => RepairStatus::READY,
+            'received_at' => '2026-05-02 10:00:00',
+            'final_cost' => '150.00',
+        ]);
+
+        Repair::query()->create([
+            'customer_id' => $this->customer->id,
+            'device_type' => 'هاتف',
+            'brand' => 'Samsung',
+            'model' => 'S22',
+            'reported_issue' => 'بطارية ضعيفة',
+            'status' => RepairStatus::WAITING_APPROVAL,
+            'received_at' => '2026-05-05 11:00:00',
+            'estimated_cost' => '200.00',
+        ]);
+
+        Repair::query()->create([
+            'customer_id' => $this->customer->id,
+            'device_type' => 'حاسوب',
+            'brand' => 'Apple',
+            'model' => 'MacBook Pro',
+            'reported_issue' => 'صيانة لوحة أم',
+            'status' => RepairStatus::DELIVERED,
+            'received_at' => '2026-05-01 09:00:00',
+            'delivered_at' => '2026-05-10 14:00:00',
+            'final_cost' => '500.00',
+            'settled_at' => '2026-05-10 14:00:00',
+        ]);
+
+        $this->grant('repairs.view');
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertSame(1, $data['alerts']['repairs_ready']);
+        $this->assertSame(1, $data['alerts']['repairs_waiting_approval']);
+
+        $workshop = $data['workshop'];
+        $this->assertSame(3, $workshop['received_count']);
+        $this->assertSame(1, $workshop['delivered_count']);
+        $this->assertSame('500.00', $workshop['delivered_revenue']);
+        $this->assertSame(2, $workshop['active_in_shop']);
+        $this->assertSame(1, $workshop['ready_for_pickup']);
+
+        $this->assertSame('Apple', $data['top_repair_brands'][0]['name']);
+        $this->assertSame(2, $data['top_repair_brands'][0]['count']);
+    }
+
+    public function test_it_reports_profit_overview_for_the_period(): void
+    {
+        $cable = $this->material('كابل أصلي', stock: '50.000', min: '5.000');
+        $invoice = $this->salesInvoice('2026-05-05', '1000.00');
+        $this->line($invoice, $cable, quantity: '10.000', total: '1000.00');
+
+        $cat = ExpenseCategory::query()->create(['name' => 'إيجار']);
+        Expense::query()->create([
+            'expense_category_id' => $cat->id,
+            'amount' => '150.00',
+            'expense_date' => '2026-05-06',
+            'payment_method' => 'CASH',
+            'recorded_by' => $this->user->id,
+            'is_counted' => true,
+        ]);
+
+        $profit = $this->getJson('/api/dashboard')->assertOk()->json('data.profit_overview');
+
+        $this->assertSame('1000.00', $profit['revenue']);
+        $this->assertSame('10.00', $profit['cogs']);
+        $this->assertSame('990.00', $profit['gross_profit']);
+        $this->assertSame(99.0, (float) $profit['gross_margin']);
+        $this->assertSame('150.00', $profit['operating_expenses']);
+        $this->assertSame('840.00', $profit['net_profit']);
+        $this->assertFalse($profit['is_loss']);
+    }
+
+    public function test_repair_sections_are_withheld_without_repairs_view(): void
+    {
+        $this->repair(RepairStatus::READY);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertFalse($data['sections']['repairs']);
+        $this->assertNull($data['workshop']);
+        $this->assertNull($data['top_repair_brands']);
+        $this->assertArrayNotHasKey('repairs_ready', $data['alerts']);
+    }
+
+    public function test_repair_sections_are_withheld_while_the_repairs_feature_is_off(): void
+    {
+        $this->repair(RepairStatus::READY);
+        $this->grant('repairs.view');
+        Setting::query()->updateOrCreate(['key' => 'feature_repairs'], ['value' => '0', 'group' => 'features', 'type' => 'bool']);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertFalse($data['sections']['repairs']);
+        $this->assertNull($data['workshop']);
+    }
+
+    public function test_switched_off_repairs_leave_the_dashboard_even_for_master(): void
+    {
+        Setting::query()->updateOrCreate(['key' => 'feature_repairs'], ['value' => '0', 'group' => 'features', 'type' => 'bool']);
+        $master = User::factory()->create();
+        $master->roles()->attach(Role::query()->create(['name' => 'المدير العام', 'slug' => 'master']));
+
+        $data = $this->actingAs($master)->getJson('/api/dashboard')->assertOk()->json('data');
+
+        // Technicians are paid from repairs, so they go with them.
+        $this->assertSame(['repairs' => false, 'technicians' => false, 'services' => true], $data['sections']);
+        $this->assertNull($data['workshop']);
+        $this->assertNull($data['top_technicians']);
+    }
+
+    public function test_switched_off_services_leave_the_dashboard_even_for_master(): void
+    {
+        Setting::query()->updateOrCreate(['key' => 'feature_services'], ['value' => '0', 'group' => 'features', 'type' => 'bool']);
+        $master = User::factory()->create();
+        $master->roles()->attach(Role::query()->create(['name' => 'المدير العام', 'slug' => 'master']));
+
+        $data = $this->actingAs($master)->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertFalse($data['sections']['services']);
+        $this->assertNull($data['top_services']);
+    }
+
+    public function test_master_sees_every_section_while_features_are_on(): void
+    {
+        $master = User::factory()->create();
+        $master->roles()->attach(Role::query()->create(['name' => 'المدير العام', 'slug' => 'master']));
+
+        $data = $this->actingAs($master)->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertSame(['repairs' => true, 'technicians' => true, 'services' => true], $data['sections']);
+    }
+
+    public function test_top_technicians_need_technicians_view(): void
+    {
+        $technician = Technician::query()->create(['name' => 'فني الشاشات', 'commission_rate' => '10.00', 'opening_balance' => '0.00', 'is_active' => true]);
+        $this->repair(RepairStatus::DELIVERED, ['technician_id' => $technician->id, 'delivered_at' => '2026-05-10 14:00:00', 'settled_at' => '2026-05-10 14:00:00', 'final_cost' => '300.00']);
+
+        $this->assertNull($this->getJson('/api/dashboard')->assertOk()->json('data.top_technicians'));
+
+        $this->grant('technicians.view');
+        $technicians = $this->getJson('/api/dashboard')->assertOk()->json('data.top_technicians');
+
+        $this->assertSame('فني الشاشات', $technicians['rows'][0]['name']);
+        $this->assertSame(1, $technicians['rows'][0]['repairs_count']);
+        $this->assertArrayHasKey('balance_owed', $technicians);
+    }
+
+    public function test_top_services_need_services_view(): void
+    {
+        $invoice = $this->salesInvoice('2026-05-02', '250.00');
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'line_type' => 'SERVICE',
+            'description' => 'تبديل شاشة',
+            'quantity' => '1.000',
+            'unit_price' => '250.00',
+            'line_total' => '250.00',
+        ]);
+
+        $this->assertNull($this->getJson('/api/dashboard')->assertOk()->json('data.top_services'));
+
+        $this->grant('services.view');
+        $services = $this->getJson('/api/dashboard')->assertOk()->json('data.top_services');
+
+        $this->assertSame('تبديل شاشة', $services[0]['name']);
+        $this->assertSame('250.00', $services[0]['revenue']);
+    }
+
     public function test_it_requires_the_dashboard_permission(): void
     {
         $this->actingAs(User::factory()->create());
@@ -396,6 +579,29 @@ class DashboardTest extends TestCase
             'sku' => strtoupper(substr(md5($name), 0, 8)),
             'cost_price' => '1.00', 'sale_price' => '2.00',
             'min_stock' => $min, 'stock_quantity' => $stock,
+        ]);
+    }
+
+    /** Adds $slug to the test user's role. */
+    protected function grant(string $slug): void
+    {
+        $this->user->roles->first()->permissions()->attach(Permission::query()->firstOrCreate(
+            ['slug' => $slug],
+            ['name' => $slug, 'group' => explode('.', $slug)[0]],
+        ));
+        $this->user->load('roles');
+    }
+
+    protected function repair(RepairStatus $status, array $attributes = []): Repair
+    {
+        return Repair::query()->create($attributes + [
+            'customer_id' => $this->customer->id,
+            'device_type' => 'هاتف',
+            'brand' => 'Apple',
+            'model' => 'iPhone 13',
+            'reported_issue' => 'كسر شاشة',
+            'status' => $status,
+            'received_at' => '2026-05-02 10:00:00',
         ]);
     }
 

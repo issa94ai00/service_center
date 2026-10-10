@@ -36,8 +36,8 @@ final class ArabicNumberToWords
     ];
 
     /**
-     * @param  string  $currency  the major unit, e.g. "ليرة سورية"
-     * @param  string  $fraction  the minor unit, e.g. "قرش"
+     * @param  string  $currency  the major unit, e.g. "دولار"
+     * @param  string  $fraction  the minor unit, e.g. "سنت"
      */
     public static function money(
         int|float|string $amount,

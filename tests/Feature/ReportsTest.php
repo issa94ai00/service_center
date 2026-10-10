@@ -6,15 +6,21 @@ use App\Enums\DocumentStatus;
 use App\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\CustomerTransaction;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Material;
 use App\Models\MaterialCategory;
 use App\Models\Permission;
+use App\Models\Repair;
 use App\Models\Role;
 use App\Models\SalesInvoice;
+use App\Models\SalesInvoiceItem;
 use App\Models\ServiceUnit;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\SupplierTransaction;
+use App\Models\Technician;
+use App\Models\TechnicianTransaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -140,6 +146,152 @@ class ReportsTest extends TestCase
         $this->getJson('/api/reports/sales-summary')
             ->assertStatus(422)
             ->assertJsonValidationErrors(['from', 'to']);
+
+        $this->getJson('/api/reports/profit-summary')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['from', 'to']);
+    }
+
+    public function test_profit_summary_aggregates_revenue_cogs_expenses_and_profits(): void
+    {
+        $material = Material::factory()->create([
+            'name' => 'شاشة آيفون',
+            'sku' => 'IPH-SCR',
+            'cost_price' => '30.00',
+            'sale_price' => '50.00',
+            'stock_quantity' => '100.000',
+            'min_stock' => '5.000',
+        ]);
+
+        $customer = $this->customer('عميل تجربة');
+
+        // Invoice 1: Material sold
+        $invoice1 = $this->salesInvoice($customer, '2026-05-10', total: '100.00', paid: '100.00');
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice1->id,
+            'line_type' => 'MATERIAL',
+            'material_id' => $material->id,
+            'quantity' => '2.000',
+            'unit_price' => '50.00',
+            'line_total' => '100.00',
+        ]);
+
+        // Invoice 2: Service sold (no material cost)
+        $invoice2 = $this->salesInvoice($customer, '2026-05-12', total: '40.00', paid: '40.00');
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice2->id,
+            'line_type' => 'SERVICE',
+            'description' => 'صيانة شاشة وبرمجة',
+            'quantity' => '1.000',
+            'unit_price' => '40.00',
+            'line_total' => '40.00',
+        ]);
+
+        // Operating expense
+        $category = ExpenseCategory::query()->create(['name' => 'كهرباء ومياه']);
+        Expense::query()->create([
+            'expense_no' => 'EXP-0001',
+            'expense_category_id' => $category->id,
+            'amount' => '15.00',
+            'payment_method' => 'CASH',
+            'expense_date' => '2026-05-11',
+            'payee' => 'شركة الكهرباء',
+            'status' => 'POSTED',
+            'recorded_by' => $this->user->id,
+        ]);
+
+        // Technician commission
+        $technician = Technician::query()->create([
+            'name' => 'خبير الصيانة أحمد',
+            'commission_rate' => '20.00',
+        ]);
+        TechnicianTransaction::query()->create([
+            'technician_id' => $technician->id,
+            'transaction_date' => '2026-05-12',
+            'type' => TransactionType::REPAIR_COMMISSION,
+            'reference_type' => Repair::class,
+            'reference_id' => 1,
+            'debit' => '0.00',
+            'credit' => '8.00',
+            'description' => 'عمولة صيانة',
+            'created_by' => $this->user->id,
+        ]);
+
+        $res = $this->getJson('/api/reports/profit-summary?from=2026-05-01&to=2026-05-31')
+            ->assertOk()
+            ->json('data');
+
+        // Revenue: 100 + 40 = 140.00
+        $this->assertSame('140.00', $res['revenue']['total']);
+        $this->assertSame('100.00', $res['revenue']['materials_revenue']);
+        $this->assertSame('40.00', $res['revenue']['services_revenue']);
+        $this->assertSame(2, $res['revenue']['invoices_count']);
+
+        // COGS: 2 items * 30.00 = 60.00
+        $this->assertSame('60.00', $res['cogs']['total']);
+
+        // Gross profit: 140.00 - 60.00 = 80.00 (margin: 80 / 140 = 57.14%)
+        $this->assertSame('80.00', $res['gross_profit']['total']);
+        $this->assertEquals(57.14, $res['gross_profit']['margin_percent']);
+
+        // Operating costs: 15.00 expense + 8.00 commission = 23.00
+        $this->assertSame('15.00', $res['operating_expenses']['total']);
+        $this->assertSame('8.00', $res['technician_commissions']['total']);
+        $this->assertSame('23.00', $res['operating_costs']['total']);
+
+        // Net profit: 80.00 - 23.00 = 57.00 (margin: 57 / 140 = 40.71%)
+        $this->assertSame('57.00', $res['net_profit']['total']);
+        $this->assertEquals(40.71, $res['net_profit']['margin_percent']);
+        $this->assertFalse($res['net_profit']['is_loss']);
+
+        // Top materials
+        $this->assertCount(1, $res['top_materials']);
+        $this->assertSame('شاشة آيفون', $res['top_materials'][0]['name']);
+        $this->assertSame('40.00', $res['top_materials'][0]['profit']);
+
+        // Expense categories
+        $this->assertCount(1, $res['operating_expenses']['by_category']);
+        $this->assertSame('كهرباء ومياه', $res['operating_expenses']['by_category'][0]['name']);
+        $this->assertSame('15.00', $res['operating_expenses']['by_category'][0]['total']);
+
+        // Daily breakdown contains active days
+        $this->assertCount(3, $res['by_day']);
+    }
+
+    public function test_profit_summary_handles_empty_period_and_losses(): void
+    {
+        // 1. Empty period
+        $res = $this->getJson('/api/reports/profit-summary?from=2026-07-01&to=2026-07-31')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('0.00', $res['revenue']['total']);
+        $this->assertSame('0.00', $res['cogs']['total']);
+        $this->assertSame('0.00', $res['gross_profit']['total']);
+        $this->assertSame('0.00', $res['net_profit']['total']);
+        $this->assertEquals(0, $res['gross_profit']['margin_percent']);
+        $this->assertEquals(0, $res['net_profit']['margin_percent']);
+        $this->assertFalse($res['net_profit']['is_loss']);
+        $this->assertCount(0, $res['by_day']);
+
+        // 2. Loss period: only expenses
+        $category = ExpenseCategory::query()->create(['name' => 'إيجار']);
+        Expense::query()->create([
+            'expense_no' => 'EXP-0002',
+            'expense_category_id' => $category->id,
+            'amount' => '500.00',
+            'payment_method' => 'CASH',
+            'expense_date' => '2026-07-15',
+            'status' => 'POSTED',
+            'recorded_by' => $this->user->id,
+        ]);
+
+        $res2 = $this->getJson('/api/reports/profit-summary?from=2026-07-01&to=2026-07-31')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('-500.00', $res2['net_profit']['total']);
+        $this->assertTrue($res2['net_profit']['is_loss']);
     }
 
     // ----------------------------------------------------------- receivables
@@ -298,6 +450,7 @@ class ReportsTest extends TestCase
             '/api/reports/low-stock',
             '/api/reports/sales-summary?from=2026-01-01&to=2026-01-31',
             '/api/reports/purchases-summary?from=2026-01-01&to=2026-01-31',
+            '/api/reports/profit-summary?from=2026-01-01&to=2026-01-31',
             '/api/reports/receivables',
             '/api/reports/payables',
             '/api/reports/stock-movements',

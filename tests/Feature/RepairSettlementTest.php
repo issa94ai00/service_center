@@ -348,7 +348,7 @@ class RepairSettlementTest extends TestCase
             'key' => 'currency_name', 'value' => 'ليرة سورية', 'group' => 'general', 'type' => 'string',
         ]);
 
-        $this->actingAs($this->userWith(['repairs.view', 'repairs.settle', 'payments.create']));
+        $this->actingAs($this->userWith(['repairs.view', 'repairs.settle', 'payments.create', 'payments.view']));
         $repair = $this->repair();
 
         $response = $this->postJson("/api/repairs/{$repair->id}/deposit", ['amount' => '30000'])->assertOk();
@@ -474,7 +474,7 @@ class RepairSettlementTest extends TestCase
 
     public function test_a_maintenance_receipt_is_flagged_in_the_payments_listing(): void
     {
-        $this->actingAs($this->userWith(['repairs.view', 'repairs.settle', 'payments.create']));
+        $this->actingAs($this->userWith(['repairs.view', 'repairs.settle', 'payments.create', 'payments.view']));
         $repair = $this->repair();
 
         $this->postJson("/api/repairs/{$repair->id}/deposit", ['amount' => '10000'])->assertOk();

@@ -272,7 +272,7 @@ class RepairsController extends Controller
         return response()->json([
             'data' => [
                 'customer_id' => $customer->id,
-                'currency' => Setting::get('currency_symbol', 'ل.س'),
+                'currency' => Setting::get('currency_symbol', '$'),
                 // Positive: the customer owes the shop. Negative: the shop is
                 // holding the customer's money.
                 'balance' => $balance->toDecimal(),

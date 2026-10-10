@@ -1,11 +1,11 @@
 <template>
     <div id="statement-sheet" class="mx-auto max-w-6xl space-y-5">
-        <div class="flex items-center justify-between print:hidden">
+        <div class="flex flex-wrap items-start justify-between gap-3 print:hidden">
             <div>
                 <h1 class="text-xl font-bold text-slate-900">كشف حساب {{ kind.label }}</h1>
                 <p class="text-sm text-slate-500">{{ statement?.party?.name || '—' }}</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 <button
                     class="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
                     @click="$router.back()"
@@ -44,12 +44,6 @@
                     إلى تاريخ
                     <input v-model="filters.to" type="date" class="mt-1 block rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                 </label>
-                <label class="text-sm">
-                    عدد الحركات
-                    <select v-model.number="filters.perPage" class="mt-1 block rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                        <option v-for="n in [25, 50, 100, 200]" :key="n" :value="n">{{ n }}</option>
-                    </select>
-                </label>
                 <button
                     class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                     @click="applyFilters"
@@ -74,6 +68,9 @@
                     <h2 class="text-lg font-bold">كشف حساب {{ kind.label }} — {{ statement.party.name }}</h2>
                     <p class="text-xs text-slate-600">
                         الفترة: {{ statement.period.from || 'البداية' }} — {{ statement.period.to || 'اليوم' }}
+                    </p>
+                    <p v-if="hasMore" class="text-[11px] text-slate-500">
+                        أول {{ statement.rows.length }} من {{ meta.total }} حركة فقط — كشف PDF يشمل الفترة كاملة
                     </p>
                 </div>
 
@@ -126,9 +123,6 @@
                                     <td class="px-3 py-2" dir="ltr">{{ statement.period.from || '—' }}</td>
                                     <td class="px-3 py-2 font-medium" colspan="2">
                                         رصيد ما قبله
-                                        <span v-if="meta && meta.current_page > 1" class="text-xs text-slate-400">
-                                            (حتى نهاية الصفحة السابقة)
-                                        </span>
                                     </td>
                                     <td class="px-3 py-2 text-left">—</td>
                                     <td class="px-3 py-2 text-left">—</td>
@@ -178,28 +172,17 @@
                     </table>
                 </div>
 
-                <div
-                    v-if="meta && meta.total"
-                    class="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-xs text-slate-500 print:hidden"
-                >
-                    <span>صفحة {{ meta.current_page }} من {{ meta.last_page }} — {{ meta.total }} حركة</span>
-                    <div class="flex gap-2">
-                        <button
-                            :disabled="meta.current_page <= 1 || loading"
-                            class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40"
-                            @click="goTo(meta.current_page - 1)"
-                        >
-                            السابق
-                        </button>
-                        <button
-                            :disabled="meta.current_page >= meta.last_page || loading"
-                            class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40"
-                            @click="goTo(meta.current_page + 1)"
-                        >
-                            التالي
-                        </button>
-                    </div>
-                </div>
+                <InfiniteScrollFooter
+                    class="mt-3"
+                    :shown="statement.rows.length"
+                    :total="meta?.total ?? 0"
+                    :has-more="hasMore"
+                    :loading-more="loadingMore"
+                    :busy="loading"
+                    :error="moreError"
+                    unit="حركة"
+                    @more="loadMore"
+                />
             </template>
 
             <div v-else-if="loading" class="py-10 text-center text-sm text-slate-400">جارٍ التحميل...</div>
@@ -208,10 +191,13 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { documentsApi, statementsApi } from '../../services/api';
 import PrintButton from '../../components/ui/PrintButton.vue';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
+import { BASE_SYMBOL } from '../../constants/currency';
 
 const route = useRoute();
 
@@ -263,12 +249,29 @@ const REFERENCE_ROUTES = {
     payment: 'payments.edit',
 };
 
-const statement = ref(null);
-const meta = ref(null);
-const loading = ref(false);
 const error = ref('');
-const page = ref(1);
-const filters = reactive({ from: '', to: '', perPage: 50 });
+const filters = reactive({ from: '', to: '' });
+
+// The server carries the running balance across pages, so appended rows stay right.
+const { items, meta, response, loading, loadingMore, moreError, hasMore, reload, loadMore } = useInfiniteList({
+    fetch: (page, perPage) => {
+        const params = { page, per_page: perPage };
+        if (filters.from) params.from = filters.from;
+        if (filters.to) params.to = filters.to;
+        return kind.fetch(route.params.id, params);
+    },
+    pageSize: 100,
+    maxPerPage: 200,
+    select: (result) => ({ rows: result?.statement?.rows ?? [], meta: result?.meta ?? null }),
+    onError: (e) => {
+        error.value = e?.response?.data?.message || 'تعذّر تحميل كشف الحساب';
+    },
+});
+
+/** Totals and balances are for the whole period; only the rows grow as the user scrolls. */
+const statement = computed(() => (response.value?.statement
+    ? { ...response.value.statement, rows: items.value }
+    : null));
 
 const numberFormat = new Intl.NumberFormat('ar-SY', {
     minimumFractionDigits: 2,
@@ -276,7 +279,7 @@ const numberFormat = new Intl.NumberFormat('ar-SY', {
 });
 
 function formatMoney(value) {
-    return numberFormat.format(Number(value) || 0);
+    return `${numberFormat.format(Number(value) || 0)}\u00a0${BASE_SYMBOL}`;
 }
 
 // Blank out zero debit/credit cells so the eye follows the side that moved.
@@ -317,7 +320,6 @@ function referenceRoute(reference, row) {
 }
 
 function applyFilters() {
-    page.value = 1;
     load();
 }
 
@@ -325,10 +327,6 @@ function resetFilters() {
     filters.from = '';
     filters.to = '';
     applyFilters();
-}
-
-function goTo(target) {
-    page.value = target;
 }
 
 function printSheet() {
@@ -344,29 +342,12 @@ function loadPdf(paper) {
     return kind.pdf(route.params.id, params, paper);
 }
 
-async function load() {
-    loading.value = true;
+function load() {
     error.value = '';
-
-    try {
-        const params = { page: page.value, per_page: filters.perPage };
-        if (filters.from) params.from = filters.from;
-        if (filters.to) params.to = filters.to;
-
-        const result = await kind.fetch(route.params.id, params);
-
-        statement.value = result.statement;
-        meta.value = result.meta ?? null;
-    } catch (e) {
-        error.value = e?.response?.data?.message || 'تعذّر تحميل كشف الحساب';
-    } finally {
-        loading.value = false;
-    }
+    return reload();
 }
 
-watch(page, load);
-
-onMounted(load);
+onMounted(() => load());
 </script>
 
 <style>

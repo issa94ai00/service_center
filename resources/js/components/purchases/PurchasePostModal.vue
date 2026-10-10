@@ -54,7 +54,7 @@
                     <span>{{ itemsLabel }}</span>
                     <template v-if="Number(doc.discount_amount) > 0">
                         <span aria-hidden="true">·</span>
-                        <span>بعد خصم {{ formatMoney(doc.discount_amount) }}</span>
+                        <span>بعد خصم {{ formatUsd(doc.discount_amount) }}</span>
                     </template>
                     <template v-if="doc.due_date">
                         <span aria-hidden="true">·</span>
@@ -99,7 +99,7 @@
                     <li v-for="row in drifted" :key="row.id" class="flex items-center justify-between gap-3">
                         <span class="truncate">{{ row.name }}</span>
                         <span class="shrink-0 tabular-nums">
-                            {{ formatMoney(row.cardCost) }} ← {{ formatMoney(row.unitPrice) }}
+                            {{ formatUsd(row.cardCost) }} ← {{ formatUsd(row.unitPrice) }}
                         </span>
                     </li>
                 </ul>
@@ -122,7 +122,7 @@
                 <li class="flex gap-2">
                     <span aria-hidden="true">📒</span>
                     <span>
-                        يُقيَّد <strong class="tabular-nums">{{ formatMoney(doc.total) }} {{ CURRENCY }}</strong>
+                        يُقيَّد <strong class="tabular-nums">{{ formatUsd(doc.total) }}</strong>
                         ديناً على المحل لصالح {{ doc.supplier?.name || 'المورد' }}، يُسدَّد بسند دفع لاحق.
                     </span>
                 </li>
@@ -148,10 +148,11 @@
 </template>
 
 <script setup>
+import { BASE_SYMBOL } from '../../constants/currency';
 import { computed, nextTick, ref, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import { purchasesApi } from '../../services/api';
-import { apiMessage, formatDate, formatMoney, formatQty } from '../../utils/format';
+import { apiMessage, formatDate, formatMoney, formatQty, formatUsd } from '../../utils/format';
 
 const props = defineProps({
     open: Boolean,
@@ -166,7 +167,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'posted', 'stale']);
 
-const CURRENCY = 'ل.س';
+const CURRENCY = BASE_SYMBOL;
 
 const doc = ref(null);
 const loading = ref(false);

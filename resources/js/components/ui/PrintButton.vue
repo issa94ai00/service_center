@@ -39,7 +39,7 @@
                 ref="menu"
                 role="menu"
                 dir="rtl"
-                class="fixed z-[200] w-64 rounded-xl border border-slate-200 bg-white p-1.5 text-right shadow-xl ring-1 ring-black/5"
+                class="fixed z-[200] max-h-[min(20rem,calc(100dvh-1rem))] w-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 text-right shadow-xl ring-1 ring-black/5"
                 :style="menuStyle"
                 @keydown.esc.prevent="closeMenu(true)"
                 @keydown.down.prevent="moveFocus(1)"
@@ -135,17 +135,17 @@ const PRESETS = {
     link: {
         wrapper: 'gap-0.5',
         button: 'text-slate-500 hover:text-slate-900 disabled:opacity-40',
-        caret: 'rounded px-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40',
+        caret: 'inline-flex min-h-7 min-w-7 items-center justify-center rounded px-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40',
     },
     icon: {
         wrapper: '',
         button: 'rounded-s-lg p-1.5 text-sm leading-none transition hover:bg-slate-100 disabled:opacity-40',
-        caret: 'rounded-e-lg px-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40',
+        caret: 'inline-flex min-w-7 items-center justify-center rounded-e-lg px-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40',
     },
     outline: {
         wrapper: 'rounded-lg border border-slate-300',
         button: 'rounded-s-lg px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-40',
-        caret: 'rounded-e-lg border-s border-slate-300 px-1.5 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40',
+        caret: 'inline-flex min-w-7 items-center justify-center rounded-e-lg border-s border-slate-300 px-1.5 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40',
     },
     button: {
         wrapper: 'rounded-lg border border-slate-300 bg-white',

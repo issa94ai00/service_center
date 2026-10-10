@@ -53,7 +53,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { formatMoney, formatQty } from '../../utils/format';
+import { formatUsd, formatQty } from '../../utils/format';
 
 const props = defineProps({
     data: { type: Object, required: true },
@@ -83,6 +83,6 @@ function isInbound(row) {
 function lineValue(row) {
     const price = Number(row.unit_price) || 0;
     if (price <= 0) return '—';
-    return formatMoney(Math.abs(Number(row.signed_quantity) || 0) * price);
+    return formatUsd(Math.abs(Number(row.signed_quantity) || 0) * price);
 }
 </script>

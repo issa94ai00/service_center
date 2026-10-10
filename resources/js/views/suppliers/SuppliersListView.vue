@@ -47,7 +47,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="loading" class="text-slate-400">
+                        <tr v-if="loading && !items.length" class="text-slate-400">
                             <td colspan="7" class="px-4 py-8 text-center">جارٍ التحميل...</td>
                         </tr>
                         <tr v-else-if="!items.length" class="text-slate-400">
@@ -68,7 +68,7 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3">
-                                <div class="flex gap-2">
+                                <div class="flex gap-2 whitespace-nowrap">
                                     <button
                                         v-if="can('suppliers.edit')"
                                         class="text-slate-500 hover:text-slate-900"
@@ -101,27 +101,16 @@
                 </table>
             </div>
 
-            <div v-if="meta" class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-                <span>
-                    صفحة {{ meta.current_page }} من {{ meta.last_page }} — {{ meta.total }} مورد
-                </span>
-                <div class="flex gap-2">
-                    <button
-                        :disabled="!meta.prev_page_url"
-                        class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40"
-                        @click="page--"
-                    >
-                        السابق
-                    </button>
-                    <button
-                        :disabled="!meta.next_page_url"
-                        class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40"
-                        @click="page++"
-                    >
-                        التالي
-                    </button>
-                </div>
-            </div>
+            <InfiniteScrollFooter
+                :shown="items.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :busy="loading"
+                :error="moreError"
+                unit="مورد"
+                @more="loadMore"
+            />
         </div>
 
         <BaseModal
@@ -145,17 +134,24 @@ import { useToast } from '../../composables/useToast';
 import { apiMessage } from '../../utils/format';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import SupplierForm from '../../components/forms/SupplierForm.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
 
 const { can } = usePermissions();
 const auth = useAuthStore();
 const toast = useToast();
 
-const items = ref([]);
-const meta = ref(null);
-const loading = ref(false);
+const { items, meta, loading, loadingMore, moreError, hasMore, reload: fetchData, loadMore } = useInfiniteList({
+    fetch: (page, perPage) => suppliersApi.index({
+        search: search.value || undefined,
+        is_active: activeFilter.value === '' ? undefined : activeFilter.value,
+        page,
+        per_page: perPage,
+    }),
+    onError: (e) => toast.error(apiMessage(e, 'تعذّر تحميل القائمة')),
+});
 const search = ref('');
 const activeFilter = ref('');
-const page = ref(1);
 const modalOpen = ref(false);
 const editing = ref(null);
 const deletingId = ref(null);
@@ -164,28 +160,11 @@ let debounceTimer = null;
 watch([search, activeFilter], () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-        page.value = 1;
         fetchData();
     }, 350);
 });
 
-watch(page, fetchData);
 
-async function fetchData() {
-    loading.value = true;
-    try {
-        const data = await suppliersApi.index({
-            search: search.value || undefined,
-            is_active: activeFilter.value === '' ? undefined : activeFilter.value,
-            page: page.value,
-            per_page: 15,
-        });
-        items.value = data.data ?? data;
-        meta.value = data.meta ?? null;
-    } finally {
-        loading.value = false;
-    }
-}
 
 function openCreate() {
     editing.value = null;
@@ -198,7 +177,7 @@ function openEdit(row) {
 }
 
 function onSaved() {
-    fetchData();
+    fetchData({ keep: true });
 }
 
 async function remove(row) {
@@ -215,7 +194,7 @@ async function remove(row) {
     try {
         await suppliersApi.destroy(row.id);
         toast.success('تم حذف المورد');
-        fetchData();
+        fetchData({ keep: true });
     } catch (e) {
         toast.error(
             apiMessage(e, 'تعذّر حذف هذا المورد — الموردون ذوو الحركات المالية لا يمكن حذفهم')

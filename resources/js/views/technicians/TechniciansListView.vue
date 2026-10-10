@@ -7,7 +7,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <RouterLink
-                    v-if="can('reports.view')"
+                    v-if="can('reports.view') && can('reports.technicians')"
                     :to="{ name: 'reports', query: { tab: 'technicians' } }"
                     class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
@@ -124,7 +124,16 @@
                 </table>
             </div>
 
-            <Pager v-if="meta && rows.length" :meta="meta" unit="خبير" @go="goToPage" @per-page="setPerPage" />
+            <InfiniteScrollFooter
+                :shown="rows.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :busy="loading"
+                :error="moreError"
+                unit="خبير"
+                @more="loadMore"
+            />
         </div>
 
         <BaseModal
@@ -138,11 +147,10 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import EmptyState from '../../components/ui/EmptyState.vue';
-import Pager from '../../components/ui/Pager.vue';
 import TableSkeleton from '../../components/ui/TableSkeleton.vue';
 import TechnicianForm from '../../components/forms/TechnicianForm.vue';
 import { techniciansApi } from '../../services/api';
@@ -150,60 +158,37 @@ import { useConfirm } from '../../composables/useConfirm';
 import { usePermissions } from '../../composables/usePermissions';
 import { useToast } from '../../composables/useToast';
 import { apiMessage, formatMoney, formatPercent } from '../../utils/format';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
 
 const { can } = usePermissions();
 const { confirm } = useConfirm();
 const toast = useToast();
 const router = useRouter();
 
-const rows = ref([]);
-const meta = ref(null);
-const loading = ref(false);
 const search = ref('');
 const activeFilter = ref('');
-const page = ref(1);
-const perPage = ref(15);
 const modalOpen = ref(false);
 const editing = ref(null);
+
+const { items: rows, meta, loading, loadingMore, moreError, hasMore, reload: load, loadMore } = useInfiniteList({
+    fetch: (page, perPage) => techniciansApi.index({
+        search: search.value || undefined,
+        is_active: activeFilter.value === '' ? undefined : activeFilter.value,
+        page,
+        per_page: perPage,
+    }),
+    onError: (e) => toast.error(apiMessage(e, 'تعذّر تحميل خبراء الصيانة')),
+});
 
 let debounce = null;
 
 watch([search, activeFilter], () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
-        page.value = 1;
         load();
     }, 350);
 });
-
-async function load() {
-    loading.value = true;
-    try {
-        const data = await techniciansApi.index({
-            search: search.value || undefined,
-            is_active: activeFilter.value === '' ? undefined : activeFilter.value,
-            page: page.value,
-            per_page: perPage.value,
-        });
-        rows.value = data.data ?? [];
-        meta.value = data.meta ?? null;
-    } catch (e) {
-        toast.error(apiMessage(e, 'تعذّر تحميل خبراء الصيانة'));
-    } finally {
-        loading.value = false;
-    }
-}
-
-function goToPage(next) {
-    page.value = next;
-    load();
-}
-
-function setPerPage(size) {
-    perPage.value = size;
-    page.value = 1;
-    load();
-}
 
 function openCreate() {
     editing.value = null;
@@ -217,7 +202,7 @@ function openEdit(row) {
 
 function onSaved() {
     toast.success('تم حفظ بيانات الخبير');
-    load();
+    load({ keep: true });
 }
 
 /** سند الصرف يُفتح مهيّأً بالخبير، فلا يُعاد اختياره في شاشة الدفعات. */
@@ -239,11 +224,15 @@ async function remove(row) {
     try {
         await techniciansApi.destroy(row.id);
         toast.success('تم حذف الخبير');
-        load();
+        load({ keep: true });
     } catch (e) {
         toast.error(apiMessage(e, 'تعذّر حذف هذا الخبير'));
     }
 }
 
-onMounted(load);
+onBeforeUnmount(() => {
+    clearTimeout(debounce);
+});
+
+onMounted(() => load());
 </script>

@@ -10,13 +10,13 @@
                     {{ isReceivables ? 'إجمالي المستحق لنا' : 'إجمالي المستحق علينا' }}
                 </div>
                 <div class="mt-1 text-2xl font-bold tabular-nums" :class="isReceivables ? 'text-emerald-900' : 'text-amber-900'">
-                    {{ formatMoney(data.totals.balance) }}
+                    {{ formatUsd(data.totals.balance) }}
                 </div>
                 <div v-if="asOf" class="mt-0.5 text-[11px] opacity-70" dir="ltr">{{ asOf }}</div>
             </div>
             <div class="rounded-xl border border-slate-200 p-4">
                 <div class="text-xs text-slate-500">متوسط الرصيد</div>
-                <div class="mt-1 text-2xl font-bold tabular-nums text-slate-900">{{ formatMoney(averageBalance) }}</div>
+                <div class="mt-1 text-2xl font-bold tabular-nums text-slate-900">{{ formatUsd(averageBalance) }}</div>
             </div>
         </div>
 
@@ -42,8 +42,8 @@
                             <a v-if="row.phone" :href="`tel:${row.phone}`" class="hover:text-slate-900 hover:underline">{{ row.phone }}</a>
                             <span v-else>—</span>
                         </td>
-                        <td class="px-4 py-3 text-left tabular-nums text-slate-500">{{ formatMoney(row.opening_balance) }}</td>
-                        <td class="px-4 py-3 text-left font-semibold tabular-nums text-slate-900">{{ formatMoney(row.balance) }}</td>
+                        <td class="px-4 py-3 text-left tabular-nums text-slate-500">{{ formatUsd(row.opening_balance) }}</td>
+                        <td class="px-4 py-3 text-left font-semibold tabular-nums text-slate-900">{{ formatUsd(row.balance) }}</td>
                         <td class="px-4 py-3 print:hidden">
                             <div class="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
                                 <div class="h-full rounded-full" :style="shareStyle(row.balance)"></div>
@@ -67,7 +67,7 @@
 <script setup>
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
-import { formatMoney } from '../../utils/format';
+import { formatUsd } from '../../utils/format';
 
 const props = defineProps({
     data: { type: Object, required: true },

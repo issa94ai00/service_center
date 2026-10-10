@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use App\Exceptions\BusinessRuleException;
+use App\Http\Middleware\CheckFeature;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureUserIsActive;
 
@@ -21,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'permission' => CheckPermission::class,
             'active' => EnsureUserIsActive::class,
+            'feature' => CheckFeature::class,
+            'master' => \App\Http\Middleware\EnsureIsMaster::class,
         ]);
 
         // A baseline request ceiling for the whole API. Only /login was

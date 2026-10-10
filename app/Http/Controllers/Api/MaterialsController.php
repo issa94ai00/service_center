@@ -27,10 +27,16 @@ class MaterialsController extends Controller
             ->with(['category', 'unit'])
             ->when($archived, fn (Builder $query) => $this->archive->withReferenceFlag($query->onlyTrashed(), Material::class))
             ->when($request->filled('search'), function (Builder $query) use ($request) {
-                $query->where(function (Builder $q) use ($request) {
-                    $q->where('name', 'like', "%{$request->search}%")
-                        ->orWhere('sku', 'like', "%{$request->search}%")
-                        ->orWhere('barcode', 'like', "%{$request->search}%");
+                $search = trim((string) $request->search);
+                $latinDigits = strtr($search, ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9']);
+                $query->where(function (Builder $q) use ($search, $latinDigits) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%")
+                        ->orWhere('barcode', 'like', "%{$search}%");
+                    if ($latinDigits !== $search) {
+                        $q->orWhere('sku', 'like', "%{$latinDigits}%")
+                          ->orWhere('barcode', 'like', "%{$latinDigits}%");
+                    }
                 });
             })
             ->when($request->filled('category_id'), function (Builder $query) use ($request) {
@@ -68,19 +74,31 @@ class MaterialsController extends Controller
             return response()->json(['data' => null, 'message' => __('لم يُرسل رمز للبحث.')], 422);
         }
 
+        $latinCode = strtr($code, ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9']);
+
         $material = Material::query()
             ->with(['category', 'unit'])
             ->where('is_active', true)
-            ->where(fn (Builder $q) => $q->where('barcode', $code)->orWhere('sku', $code))
+            ->where(function (Builder $q) use ($code, $latinCode) {
+                $q->where('barcode', $code)
+                    ->orWhere('sku', $code)
+                    ->orWhere('barcode', $latinCode)
+                    ->orWhere('sku', $latinCode);
+            })
             // الباركود أوّلاً عند تعارض نادر بين باركود مادة وsku أخرى.
-            ->orderByRaw('CASE WHEN barcode = ? THEN 0 ELSE 1 END', [$code])
+            ->orderByRaw('CASE WHEN barcode = ? OR barcode = ? THEN 0 ELSE 1 END', [$code, $latinCode])
             ->first();
 
         if (! $material) {
             // A scan of an archived item is a common, fixable surprise: say so
             // instead of "unknown code".
             $archived = Material::onlyTrashed()
-                ->where(fn (Builder $q) => $q->where('barcode', $code)->orWhere('sku', $code))
+                ->where(function (Builder $q) use ($code, $latinCode) {
+                    $q->where('barcode', $code)
+                        ->orWhere('sku', $code)
+                        ->orWhere('barcode', $latinCode)
+                        ->orWhere('sku', $latinCode);
+                })
                 ->value('name');
 
             return response()->json([

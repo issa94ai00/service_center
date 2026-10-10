@@ -1,3 +1,5 @@
+import { BASE_SYMBOL } from '../constants/currency';
+
 /**
  * Formatting and input-normalisation helpers shared by the repair screens.
  */
@@ -49,6 +51,15 @@ export function formatMoney(value, { fraction = 2 } = {}) {
         minimumFractionDigits: fraction,
         maximumFractionDigits: fraction,
     }).format(n);
+}
+
+/**
+ * A book amount (always USD) with its symbol: "1,250.00 $". The space is
+ * non-breaking so the symbol never wraps away from a narrow table cell.
+ */
+export function formatUsd(value, options) {
+    const text = formatMoney(value, options);
+    return text === '—' ? text : `${text} ${BASE_SYMBOL}`;
 }
 
 /** "2026-09-10 14:30" -> a Date, without the Safari/iOS NaN on the space form. */

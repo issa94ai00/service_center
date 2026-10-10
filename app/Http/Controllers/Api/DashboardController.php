@@ -29,6 +29,7 @@ class DashboardController extends Controller
                 $validated['from'] ?? null,
                 $validated['to'] ?? null,
                 $request->boolean('compare'),
+                $request->user(),
             ),
         ]);
     }

@@ -38,7 +38,7 @@
         </div>
 
         <!-- --------------------------------------------------------- summary -->
-        <div class="grid gap-3 sm:grid-cols-3">
+        <div class="grid gap-3 md:grid-cols-3">
             <div
                 v-for="card in summaryCards"
                 :key="card.label"
@@ -46,7 +46,7 @@
                 :class="card.accent"
             >
                 <p class="text-xs font-medium text-slate-500">{{ card.label }}</p>
-                <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+                <p class="mt-1 break-words text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
                     {{ card.value }}
                     <span class="text-xs font-normal text-slate-400">{{ CURRENCY }}</span>
                 </p>
@@ -208,6 +208,7 @@
                             <td class="px-4 py-3">{{ paymentMethodLabel(row.payment_method) }}</td>
                             <td class="px-3 py-3 text-left font-semibold tabular-nums" :class="row.status === 'CANCELLED' ? 'text-slate-400 line-through' : 'text-slate-900'">
                                 {{ formatMoney(row.amount) }}
+                                <ForeignAmount :row="row" />
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap items-center gap-3">
@@ -237,7 +238,16 @@
                 </table>
             </div>
 
-            <Pager v-if="meta && rows.length" :meta="meta" unit="مصروف" @go="goToPage" @per-page="setPerPage" />
+            <InfiniteScrollFooter
+                :shown="rows.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :busy="loading"
+                :error="moreError"
+                unit="مصروف"
+                @more="loadMore"
+            />
         </div>
 
         <!-- ---------------------------------------------------------- modals -->
@@ -265,7 +275,7 @@
             <dl v-if="detail" class="grid grid-cols-2 gap-3 text-sm">
                 <div><dt class="text-slate-500">الباب</dt><dd class="font-medium">{{ detail.category_name || '—' }}</dd></div>
                 <div><dt class="text-slate-500">التاريخ</dt><dd dir="ltr">{{ detail.expense_date }}</dd></div>
-                <div><dt class="text-slate-500">المبلغ</dt><dd class="font-bold tabular-nums">{{ formatMoney(detail.amount) }} {{ CURRENCY }}</dd></div>
+                <div><dt class="text-slate-500">المبلغ</dt><dd class="font-bold tabular-nums">{{ formatMoney(detail.amount) }} {{ CURRENCY }}<ForeignAmount :row="detail" /></dd></div>
                 <div><dt class="text-slate-500">الطريقة</dt><dd>{{ paymentMethodLabel(detail.payment_method) }}</dd></div>
                 <div><dt class="text-slate-500">المستفيد</dt><dd>{{ detail.payee || '—' }}</dd></div>
                 <div><dt class="text-slate-500">سجّله</dt><dd>{{ detail.recorded_by_name || '—' }}</dd></div>
@@ -337,12 +347,15 @@ import { useRoute, useRouter } from 'vue-router';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import EmptyState from '../../components/ui/EmptyState.vue';
 import Field from '../../components/ui/FormField.vue';
-import Pager from '../../components/ui/Pager.vue';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
 import StatusBadge from '../../components/ui/StatusBadge.vue';
 import TableSkeleton from '../../components/ui/TableSkeleton.vue';
 import ExpenseForm from '../../components/expenses/ExpenseForm.vue';
 import ExpenseCategoriesModal from '../../components/expenses/ExpenseCategoriesModal.vue';
 import { expenseCategoriesApi, expensesApi } from '../../services/api';
+import ForeignAmount from '../../components/ui/ForeignAmount.vue';
+import { BASE_SYMBOL } from '../../constants/currency';
 import { usePermissions } from '../../composables/usePermissions';
 import { useToast } from '../../composables/useToast';
 import { PAYMENT_METHODS, paymentMethodLabel } from '../../constants/paymentMethods';
@@ -354,7 +367,7 @@ const router = useRouter();
 const { can } = usePermissions();
 const toast = useToast();
 
-const CURRENCY = 'ل.س';
+const CURRENCY = BASE_SYMBOL;
 /** فتح نموذج التسجيل تفضيل شاشة واحدة، فيُحفظ في المتصفح لا على الحساب. */
 const QUICK_ADD_KEY = 'expenses.quickAdd';
 
@@ -365,19 +378,30 @@ const PERIODS = [
     { label: 'الكل', from: () => '', to: () => '' },
 ];
 
-const rows = ref([]);
-const meta = ref(null);
-const summary = ref(null);
+const {
+    items: rows, meta, response, loading, loadingMore, moreError, hasMore, reload: load, loadMore,
+} = useInfiniteList({
+    fetch: (page, perPage) => expensesApi.index({
+        search: search.value || undefined,
+        expense_category_id: categoryFilter.value || undefined,
+        payment_method: methodFilter.value || undefined,
+        status: statusFilter.value || undefined,
+        from: from.value || undefined,
+        to: to.value || undefined,
+        page,
+        per_page: perPage,
+    }),
+    onError: (e) => toast.error(apiMessage(e, 'تعذّر تحميل المصاريف')),
+});
+/** The totals cover the whole filter, not just the rows scrolled into view. */
+const summary = computed(() => response.value?.summary ?? null);
 const categories = ref([]);
-const loading = ref(false);
 const search = ref('');
 const categoryFilter = ref('');
 const methodFilter = ref('');
 const statusFilter = ref('');
 const from = ref(monthStart());
 const to = ref(isoDate());
-const page = ref(1);
-const perPage = ref(25);
 const detail = ref(null);
 const editing = ref(null);
 const cancelling = ref(null);
@@ -492,33 +516,9 @@ function clearFilters() {
 watch([search, categoryFilter, methodFilter, statusFilter, from, to], () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
-        page.value = 1;
         load();
     }, 350);
 });
-
-async function load() {
-    loading.value = true;
-    try {
-        const data = await expensesApi.index({
-            search: search.value || undefined,
-            expense_category_id: categoryFilter.value || undefined,
-            payment_method: methodFilter.value || undefined,
-            status: statusFilter.value || undefined,
-            from: from.value || undefined,
-            to: to.value || undefined,
-            page: page.value,
-            per_page: perPage.value,
-        });
-        rows.value = data.data ?? [];
-        meta.value = data.meta ?? null;
-        summary.value = data.summary ?? null;
-    } catch (e) {
-        toast.error(apiMessage(e, 'تعذّر تحميل المصاريف'));
-    } finally {
-        loading.value = false;
-    }
-}
 
 async function loadCategories() {
     try {
@@ -528,17 +528,6 @@ async function loadCategories() {
     }
 }
 
-function goToPage(next) {
-    page.value = next;
-    load();
-}
-
-function setPerPage(size) {
-    perPage.value = size;
-    page.value = 1;
-    load();
-}
-
 /**
  * بعد كل حفظ تُعاد القائمة والمجاميع: الرقم الذي في الأعلى يجب أن يكون قد
  * تحرّك، وإلّا شكّ المستخدم في أن سنده سُجّل.
@@ -546,7 +535,7 @@ function setPerPage(size) {
 function onSaved({ message, again }) {
     toast.success(message || 'تم حفظ المصروف');
     if (!again) editing.value = null;
-    load();
+    load({ keep: true });
     // باب استُعمل للتوّ يصعد في ترتيب الأزرار، فترتيبها يتبع عادة المحل.
     loadCategories();
 }
@@ -569,7 +558,7 @@ async function confirmCancel() {
         await expensesApi.cancel(cancelling.value.id, { reason: cancelReason.value });
         toast.success('تم إلغاء المصروف');
         cancelling.value = null;
-        load();
+        load({ keep: true });
     } catch (e) {
         cancelError.value = apiMessage(e, 'تعذّر الإلغاء');
     } finally {
@@ -585,7 +574,10 @@ function exportCsv() {
         { label: 'المستفيد', value: (row) => row.payee },
         { label: 'البيان', value: (row) => row.notes },
         { label: 'الطريقة', value: (row) => paymentMethodLabel(row.payment_method) },
-        { label: 'المبلغ', value: (row) => csvNumber(row.amount) },
+        { label: `المبلغ (${CURRENCY})`, value: (row) => csvNumber(row.amount) },
+        { label: 'العملة', value: (row) => row.currency_code || 'USD' },
+        { label: 'المبلغ بالعملة', value: (row) => csvNumber(row.currency_amount ?? row.amount) },
+        { label: 'سعر الصرف', value: (row) => row.exchange_rate ?? '1' },
         { label: 'الحالة', value: (row) => (row.status === 'CANCELLED' ? 'ملغى' : 'مسجّل') },
     ];
 

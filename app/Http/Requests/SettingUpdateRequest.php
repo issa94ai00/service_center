@@ -11,7 +11,12 @@ class SettingUpdateRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->user()?->hasPermission('settings.manage') ?? false;
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasPermission('settings.manage') || $user->hasPermission('features.manage');
     }
 
     /**
@@ -23,6 +28,9 @@ class SettingUpdateRequest extends FormRequest
      */
     protected const ALLOWED_VALUES = [
         'inventory_sale_policy' => ['strict', 'permissive'],
+        'currency_code' => ['USD'],
+        'currency_symbol' => ['$'],
+        'currency_name' => ['دولار', 'دولار أمريكي', 'USD'],
     ];
 
     /**
@@ -104,12 +112,36 @@ class SettingUpdateRequest extends FormRequest
             'values.inventory_sale_policy.in' => 'سياسة المخزون يجب أن تكون "strict" أو "permissive".',
             'values.company_name.required' => 'اسم الشركة مطلوب.',
             'values.currency_symbol.required' => 'رمز العملة مطلوب.',
+            'values.currency_symbol.in' => 'العملة المعتمدة في النظام هي الدولار ($) فقط.',
             'values.currency_name.required' => 'اسم العملة مطلوب.',
+            'values.currency_name.in' => 'اسم العملة المعتمد في النظام هو دولار فقط.',
+            'values.currency_code.in' => 'كود العملة المعتمد في النظام هو USD فقط.',
             'values.print_paper_*.in' => 'حجم الورق غير مدعوم لهذا النوع من المستندات.',
             'values.print_paper_*.required' => 'اختر حجم الورق الافتراضي.',
             'values.print_footer_note.max' => 'ملاحظة التذييل طويلة — الحد الأقصى :max حرفًا.',
             'values.print_repair_terms.max' => 'شروط الصيانة طويلة — الحد الأقصى :max حرف.',
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $user = $this->user();
+            if (! $user) {
+                return;
+            }
+
+            $featureKeys = Setting::where('group', 'features')->pluck('key')->all();
+            $submittedKeys = array_keys($this->input('values', []));
+
+            if (! $user->hasPermission('features.manage') && array_intersect($featureKeys, $submittedKeys)) {
+                $validator->errors()->add('values', __('تشغيل وتعطيل ميزات النظام يتطلب صلاحية "إدارة وتفعيل ميزات النظام".'));
+            }
+
+            if (! $user->hasPermission('settings.manage') && array_diff($submittedKeys, $featureKeys)) {
+                $validator->errors()->add('values', __('تعديل الإعدادات العامة يتطلب صلاحية "إدارة الإعدادات".'));
+            }
+        });
     }
 
     public function validatedValues(): array

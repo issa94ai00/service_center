@@ -84,7 +84,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="loading" class="text-slate-400"><td colspan="8" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
+                        <tr v-if="loading && !(tab === 'stock' ? rows : adjustments).length" class="text-slate-400"><td colspan="8" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
                         <tr v-else-if="!rows.length" class="text-slate-400"><td colspan="8" class="px-4 py-8 text-center">لا توجد مواد</td></tr>
                         <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50">
                             <td class="px-4 py-3 font-medium text-slate-900">
@@ -113,7 +113,16 @@
                 </table>
             </div>
 
-            <Pager v-if="meta" :meta="meta" unit="مادة" @go="goTo" />
+            <InfiniteScrollFooter
+                :shown="rows.length"
+                :total="stockMeta?.total ?? 0"
+                :has-more="stockHasMore"
+                :loading-more="stockLoadingMore"
+                :busy="stockLoading"
+                :error="stockMoreError"
+                unit="مادة"
+                @more="loadMoreStock"
+            />
         </div>
 
         <!-- ------------------------------------------------------ adjustments -->
@@ -132,7 +141,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="loading" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
+                        <tr v-if="loading && !(tab === 'stock' ? rows : adjustments).length" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
                         <tr v-else-if="!adjustments.length" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">لا توجد تسويات</td></tr>
                         <tr v-for="adj in adjustments" :key="adj.id" class="align-top">
                             <td class="px-4 py-3 font-semibold text-slate-900" dir="ltr">{{ adj.adjustment_no }}</td>
@@ -160,7 +169,16 @@
                 </table>
             </div>
 
-            <Pager v-if="meta" :meta="meta" unit="تسوية" @go="goTo" />
+            <InfiniteScrollFooter
+                :shown="adjustments.length"
+                :total="adjMeta?.total ?? 0"
+                :has-more="adjHasMore"
+                :loading-more="adjLoadingMore"
+                :busy="adjLoading"
+                :error="adjMoreError"
+                unit="تسوية"
+                @more="loadMoreAdjustments"
+            />
         </div>
 
         <!-- ----------------------------------------------------- adjust modal -->
@@ -244,7 +262,7 @@
                     </div>
                 </div>
 
-                <div class="max-h-80 overflow-auto">
+                <div class="overflow-x-auto sm:max-h-80 sm:overflow-auto">
                     <table class="w-full text-right text-sm">
                         <thead class="sticky top-0 bg-slate-50 text-xs font-semibold text-slate-500">
                             <tr>
@@ -281,35 +299,16 @@
 </template>
 
 <script setup>
-import { computed, h, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import FormField from '../../components/ui/FormField.vue';
 import StatusBadge from '../../components/ui/StatusBadge.vue';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
 import { inventoryApi, materialsApi } from '../../services/api';
 import { usePermissions } from '../../composables/usePermissions';
 
 const { can } = usePermissions();
-
-// Small inline pager so both tables share one control.
-const Pager = (props, { emit }) => h('div', {
-    class: 'flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500',
-}, [
-    h('span', `صفحة ${props.meta.current_page} من ${props.meta.last_page} — ${props.meta.total} ${props.unit}`),
-    h('div', { class: 'flex gap-2' }, [
-        h('button', {
-            class: 'rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40',
-            disabled: props.meta.current_page <= 1,
-            onClick: () => emit('go', props.meta.current_page - 1),
-        }, 'السابق'),
-        h('button', {
-            class: 'rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40',
-            disabled: props.meta.current_page >= props.meta.last_page,
-            onClick: () => emit('go', props.meta.current_page + 1),
-        }, 'التالي'),
-    ]),
-]);
-Pager.props = ['meta', 'unit'];
-Pager.emits = ['go'];
 
 const tabs = [
     { key: 'stock', label: 'أرصدة المواد' },
@@ -317,18 +316,42 @@ const tabs = [
 ];
 
 const tab = ref('stock');
-const loading = ref(false);
 const error = ref('');
 const notice = ref('');
-const page = ref(1);
-
-const rows = ref([]);
-const adjustments = ref([]);
-const totals = ref(null);
-const meta = ref(null);
 const materialOptions = ref([]);
 
 const filters = reactive({ search: '', status: 'all' });
+
+const loadFailed = (e) => {
+    error.value = e?.response?.data?.message || 'تعذّر تحميل بيانات المخزون';
+};
+
+// Each tab scrolls its own list; the stock endpoint caps per_page at 200.
+const {
+    items: rows, meta: stockMeta, response: stockResponse, loading: stockLoading, loadingMore: stockLoadingMore,
+    moreError: stockMoreError, hasMore: stockHasMore, reload: reloadStock, loadMore: loadMoreStock,
+} = useInfiniteList({
+    fetch: (page, perPage) => inventoryApi.index({
+        page,
+        per_page: perPage,
+        status: filters.status,
+        search: filters.search || undefined,
+    }),
+    maxPerPage: 200,
+    onError: loadFailed,
+});
+
+const {
+    items: adjustments, meta: adjMeta, loading: adjLoading, loadingMore: adjLoadingMore,
+    moreError: adjMoreError, hasMore: adjHasMore, reload: reloadAdjustments, loadMore: loadMoreAdjustments,
+} = useInfiniteList({
+    fetch: (page, perPage) => inventoryApi.adjustments({ page, per_page: perPage }),
+    onError: loadFailed,
+});
+
+/** The cards count every material under the filter, not just the rows scrolled into view. */
+const totals = computed(() => stockResponse.value?.totals ?? null);
+const loading = computed(() => (tab.value === 'stock' ? stockLoading.value : adjLoading.value));
 
 const adjustOpen = ref(false);
 const saving = ref(false);
@@ -351,18 +374,10 @@ function tabClass(key) {
 function selectTab(key) {
     if (tab.value === key) return;
     tab.value = key;
-    page.value = 1;
-    meta.value = null;
     load();
 }
 
 function applyFilters() {
-    page.value = 1;
-    load();
-}
-
-function goTo(target) {
-    page.value = target;
     load();
 }
 
@@ -405,7 +420,7 @@ async function submitAdjustment() {
         adjustOpen.value = false;
         notice.value = 'تم تسجيل التسوية وتحديث الأرصدة.';
         setTimeout(() => (notice.value = ''), 4000);
-        await load();
+        await load({ keep: true });
     } catch (e) {
         const data = e?.response?.data;
         if (data?.errors) {
@@ -429,7 +444,7 @@ async function cancelAdjustment(adjustment) {
         await inventoryApi.cancelAdjustment(adjustment.id, reason);
         notice.value = 'تم إلغاء التسوية وإرجاع الكميات.';
         setTimeout(() => (notice.value = ''), 4000);
-        await load();
+        await load({ keep: true });
     } catch (e) {
         error.value = e?.response?.data?.message || 'تعذّر إلغاء التسوية';
     }
@@ -446,30 +461,10 @@ async function openHistory(material) {
     }
 }
 
-async function load() {
-    loading.value = true;
+function load({ keep = false } = {}) {
     error.value = '';
-
-    try {
-        if (tab.value === 'stock') {
-            const params = { page: page.value, status: filters.status };
-            if (filters.search) params.search = filters.search;
-
-            const response = await inventoryApi.index(params);
-            rows.value = response.data ?? [];
-            meta.value = response.meta ?? null;
-            totals.value = response.totals ?? null;
-        } else {
-            const response = await inventoryApi.adjustments({ page: page.value });
-            adjustments.value = response.data ?? [];
-            meta.value = response.meta ?? null;
-        }
-    } catch (e) {
-        error.value = e?.response?.data?.message || 'تعذّر تحميل بيانات المخزون';
-    } finally {
-        loading.value = false;
-    }
+    return tab.value === 'stock' ? reloadStock({ keep }) : reloadAdjustments({ keep });
 }
 
-onMounted(load);
+onMounted(() => load());
 </script>

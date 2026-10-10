@@ -33,7 +33,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="loading" class="text-slate-400"><td colspan="5" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
+                        <tr v-if="loading && !items.length" class="text-slate-400"><td colspan="5" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
                         <tr v-else-if="!items.length" class="text-slate-400"><td colspan="5" class="px-4 py-8 text-center">لا توجد نتائج</td></tr>
                         <tr v-for="row in items" :key="row.id" class="hover:bg-slate-50">
                             <td class="px-4 py-3 font-medium text-slate-900">{{ row.name }}</td>
@@ -59,15 +59,16 @@
                     </tbody>
                 </table>
             </div>
-            <div v-if="meta" class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-                <span>صفحة {{ meta.current_page }} من {{ meta.last_page }} — {{ meta.total }}</span>
-                <div class="flex gap-2">
-                    <button :disabled="!meta.prev_page_url"
-                        class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page--">السابق</button>
-                    <button :disabled="!meta.next_page_url"
-                        class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page++">التالي</button>
-                </div>
-            </div>
+            <InfiniteScrollFooter
+                :shown="items.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :busy="loading"
+                :error="moreError"
+                unit="فئة"
+                @more="loadMore"
+            />
         </div>
 
         <BaseModal :open="modalOpen" :title="editing ? 'تعديل صنف' : 'صنف جديد'" @close="modalOpen = false">
@@ -85,15 +86,22 @@ import { useToast } from '../../composables/useToast';
 import { apiMessage } from '../../utils/format';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import MaterialCategoryForm from '../../components/forms/MaterialCategoryForm.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
 
 const { can } = usePermissions();
 const toast = useToast();
-const items = ref([]);
-const meta = ref(null);
-const loading = ref(false);
+const { items, meta, loading, loadingMore, moreError, hasMore, reload: fetchData, loadMore } = useInfiniteList({
+    fetch: (page, perPage) => materialCategoriesApi.index({
+        search: search.value || undefined,
+        is_active: activeFilter.value === '' ? undefined : activeFilter.value,
+        page,
+        per_page: perPage,
+    }),
+    onError: (e) => toast.error(apiMessage(e, 'تعذّر تحميل القائمة')),
+});
 const search = ref('');
 const activeFilter = ref('');
-const page = ref(1);
 const modalOpen = ref(false);
 const editing = ref(null);
 const deletingId = ref(null);
@@ -101,25 +109,9 @@ let t = null;
 
 watch([search, activeFilter], () => {
     clearTimeout(t);
-    t = setTimeout(() => { page.value = 1; fetchData(); }, 350);
+    t = setTimeout(() => fetchData(), 350);
 });
-watch(page, fetchData);
 
-async function fetchData() {
-    loading.value = true;
-    try {
-        const data = await materialCategoriesApi.index({
-            search: search.value || undefined,
-            is_active: activeFilter.value === '' ? undefined : activeFilter.value,
-            page: page.value,
-            per_page: 15,
-        });
-        items.value = data.data ?? data;
-        meta.value = data.meta ?? null;
-    } finally {
-        loading.value = false;
-    }
-}
 
 function parentName(id) {
     if (!id) return '—';
@@ -129,7 +121,7 @@ function parentName(id) {
 
 function openCreate() { editing.value = null; modalOpen.value = true; }
 function openEdit(row) { editing.value = row; modalOpen.value = true; }
-function onSaved() { fetchData(); }
+function onSaved() { fetchData({ keep: true }); }
 
 async function remove(row) {
     const ok = await confirm({
@@ -145,7 +137,7 @@ async function remove(row) {
     try {
         await materialCategoriesApi.destroy(row.id);
         toast.success('تم حذف الصنف');
-        fetchData();
+        fetchData({ keep: true });
     } catch (e) {
         toast.error(
             apiMessage(e, 'تعذّر حذف هذا الصنف — الأصناف ذات المواد أو الأصناف الفرعية لا يمكن حذفها')

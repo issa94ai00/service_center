@@ -1,16 +1,16 @@
 <template>
     <div class="space-y-5 px-4 pb-4">
         <!-- Headline: the total, with the two ratios that qualify it. -->
-        <div class="grid gap-4 lg:grid-cols-3">
+        <div class="grid gap-4 xl:grid-cols-3">
             <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 lg:col-span-1">
                 <div class="text-sm text-slate-500">{{ isSales ? 'إجمالي المبيعات' : 'إجمالي المشتريات' }}</div>
-                <div class="mt-1 text-3xl font-bold tabular-nums text-slate-900">{{ formatMoney(summary.total) }}</div>
+                <div class="mt-1 break-words text-2xl font-bold tabular-nums text-slate-900 sm:text-3xl">{{ formatUsd(summary.total) }}</div>
                 <p class="mt-2 text-xs text-slate-500">
-                    {{ formatCount(summary.count) }} فاتورة · متوسط الفاتورة {{ formatMoney(averageInvoice) }}
+                    {{ formatCount(summary.count) }} فاتورة · متوسط الفاتورة {{ formatUsd(averageInvoice) }}
                 </p>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+            <div class="grid gap-4 sm:grid-cols-2 xl:col-span-2">
                 <div v-for="card in cards" :key="card.label" class="rounded-2xl border border-slate-200 p-5">
                     <div class="text-sm text-slate-500">{{ card.label }}</div>
                     <div class="mt-1 text-xl font-bold tabular-nums" :class="card.tone || 'text-slate-900'">
@@ -26,9 +26,9 @@
             <div class="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 class="text-sm font-bold text-slate-900">{{ isSales ? 'نسبة التحصيل' : 'نسبة السداد' }}</h3>
                 <p class="text-xs text-slate-500">
-                    <span class="font-semibold tabular-nums text-slate-700">{{ formatMoney(summary.paid) }}</span>
+                    <span class="font-semibold tabular-nums text-slate-700">{{ formatUsd(summary.paid) }}</span>
                     مدفوع من
-                    <span class="font-semibold tabular-nums text-slate-700">{{ formatMoney(summary.total) }}</span>
+                    <span class="font-semibold tabular-nums text-slate-700">{{ formatUsd(summary.total) }}</span>
                 </p>
             </div>
             <div class="mt-2 flex items-center gap-3">
@@ -38,7 +38,7 @@
                 <span class="w-12 text-left text-sm font-bold tabular-nums text-slate-900">{{ formatPercent(paidRatio) }}</span>
             </div>
             <p v-if="Number(summary.outstanding) > 0" class="mt-2 text-xs text-amber-700">
-                متبقٍ {{ formatMoney(summary.outstanding) }} على {{ isSales ? 'العملاء' : 'الموردين' }}
+                متبقٍ {{ formatUsd(summary.outstanding) }} على {{ isSales ? 'العملاء' : 'الموردين' }}
             </p>
         </div>
 
@@ -48,7 +48,7 @@
                 <h3 class="text-sm font-bold text-slate-900">الحركة اليومية</h3>
                 <span class="text-xs text-slate-400" dir="ltr">{{ summary.from }} — {{ summary.to }}</span>
             </div>
-            <TrendChart :points="points" :series="series" :format-value="formatMoney" :height="220" />
+            <TrendChart :points="points" :series="series" :format-value="formatUsd" :height="220" />
         </div>
 
         <div>
@@ -57,7 +57,7 @@
                 <p v-if="busiestDay" class="text-xs text-slate-500">
                     أعلى يوم
                     <span dir="ltr" class="font-medium text-slate-700">{{ busiestDay.date }}</span>
-                    · {{ formatMoney(busiestDay.total) }}
+                    · {{ formatUsd(busiestDay.total) }}
                 </p>
             </div>
 
@@ -77,10 +77,10 @@
                         <tr v-for="day in days" :key="day.date" class="transition hover:bg-slate-50">
                             <td class="px-4 py-3 text-slate-700" dir="ltr">{{ day.date }}</td>
                             <td class="px-4 py-3 text-left tabular-nums text-slate-600">{{ formatCount(day.count) }}</td>
-                            <td class="px-4 py-3 text-left font-semibold tabular-nums text-slate-900">{{ formatMoney(day.total) }}</td>
-                            <td class="px-4 py-3 text-left tabular-nums text-emerald-700">{{ formatMoney(day.paid) }}</td>
+                            <td class="px-4 py-3 text-left font-semibold tabular-nums text-slate-900">{{ formatUsd(day.total) }}</td>
+                            <td class="px-4 py-3 text-left tabular-nums text-emerald-700">{{ formatUsd(day.paid) }}</td>
                             <td class="px-4 py-3 text-left tabular-nums" :class="Number(day.outstanding) > 0 ? 'text-amber-700' : 'text-slate-400'">
-                                {{ formatMoney(day.outstanding) }}
+                                {{ formatUsd(day.outstanding) }}
                             </td>
                             <td class="px-4 py-3 print:hidden">
                                 <div class="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
@@ -93,9 +93,9 @@
                         <tr>
                             <td class="px-4 py-3">الإجمالي</td>
                             <td class="px-4 py-3 text-left tabular-nums">{{ formatCount(summary.count) }}</td>
-                            <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(summary.total) }}</td>
-                            <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(summary.paid) }}</td>
-                            <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(summary.outstanding) }}</td>
+                            <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(summary.total) }}</td>
+                            <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(summary.paid) }}</td>
+                            <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(summary.outstanding) }}</td>
                             <td class="print:hidden"></td>
                         </tr>
                     </tfoot>
@@ -108,7 +108,7 @@
 <script setup>
 import { computed } from 'vue';
 import TrendChart from '../charts/TrendChart.vue';
-import { formatMoney, formatPercent } from '../../utils/format';
+import { formatUsd, formatPercent } from '../../utils/format';
 
 const props = defineProps({
     summary: { type: Object, required: true },
@@ -129,17 +129,17 @@ const discountShare = computed(() => {
 });
 
 const cards = computed(() => [
-    { label: 'المجموع قبل الخصم', value: formatMoney(props.summary.subtotal) },
+    { label: 'المجموع قبل الخصم', value: formatUsd(props.summary.subtotal) },
     {
         label: 'الخصم',
-        value: formatMoney(props.summary.discount),
+        value: formatUsd(props.summary.discount),
         tone: Number(props.summary.discount) > 0 ? 'text-red-600' : 'text-slate-900',
         hint: discountShare.value,
     },
-    { label: 'المدفوع', value: formatMoney(props.summary.paid), tone: 'text-emerald-700' },
+    { label: 'المدفوع', value: formatUsd(props.summary.paid), tone: 'text-emerald-700' },
     {
         label: 'المتبقي',
-        value: formatMoney(props.summary.outstanding),
+        value: formatUsd(props.summary.outstanding),
         tone: Number(props.summary.outstanding) > 0 ? 'text-amber-700' : 'text-slate-900',
     },
 ]);

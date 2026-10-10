@@ -1,5 +1,5 @@
 <template>
-    <form class="mx-auto max-w-5xl space-y-5 pb-28" @submit.prevent="submit">
+    <form class="mx-auto max-w-5xl space-y-5 pb-40 sm:pb-28" @submit.prevent="submit">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h1 class="text-xl font-bold text-slate-900">{{ isEdit ? 'تعديل فاتورة بيع' : 'فاتورة بيع جديدة' }}</h1>
@@ -87,14 +87,14 @@
 
             <div v-else>
                 <!-- جدول على الشاشة الواسعة -->
-                <table class="hidden w-full text-right text-sm sm:table">
+                <table class="hidden w-full text-right text-sm md:table">
                     <thead class="bg-slate-50 text-xs font-semibold text-slate-500">
                         <tr>
                             <th class="w-16 px-3 py-2">النوع</th>
                             <th class="px-3 py-2">العنصر</th>
                             <th class="w-24 px-3 py-2">الكمية</th>
-                            <th class="w-28 px-3 py-2">سعر الوحدة</th>
-                            <th class="w-24 px-3 py-2">الخصم</th>
+                            <th class="w-28 px-3 py-2">سعر الوحدة ({{ BASE_SYMBOL }})</th>
+                            <th class="w-24 px-3 py-2">الخصم ({{ BASE_SYMBOL }})</th>
                             <th class="w-32 px-3 py-2 text-left">الإجمالي</th>
                             <th class="w-10 px-3 py-2"></th>
                         </tr>
@@ -169,7 +169,7 @@
                                 />
                             </td>
                             <td class="px-3 py-2 text-left align-top font-semibold tabular-nums">
-                                {{ formatMoney(lineTotal(line)) }}
+                                {{ formatUsd(lineTotal(line)) }}
                             </td>
                             <td class="px-3 py-2 text-left align-top">
                                 <button
@@ -186,7 +186,7 @@
                 </table>
 
                 <!-- بطاقات على الهاتف: جدول بسبعة أعمدة لا يُقرأ على ٤٠٠ بكسل -->
-                <ul class="divide-y divide-slate-100 sm:hidden">
+                <ul class="divide-y divide-slate-100 md:hidden">
                     <li
                         v-for="(line, i) in form.items"
                         :key="line.key"
@@ -203,7 +203,7 @@
                             <button
                                 type="button"
                                 :aria-label="`حذف السطر ${i + 1}`"
-                                class="text-red-500"
+                                class="-m-2 flex h-10 w-10 shrink-0 items-center justify-center text-red-500"
                                 @click="removeLine(i)"
                             >
                                 ✕
@@ -238,17 +238,17 @@
                                 <input v-model="line.quantity" type="number" step="0.001" min="0.001" class="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm tabular-nums" />
                             </label>
                             <label class="text-xs text-slate-500">
-                                السعر
+                                السعر ({{ BASE_SYMBOL }})
                                 <input v-model="line.unit_price" type="number" step="0.01" min="0" class="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm tabular-nums" />
                             </label>
                             <label class="text-xs text-slate-500">
-                                الخصم
+                                الخصم ({{ BASE_SYMBOL }})
                                 <input v-model="line.discount_amount" type="number" step="0.01" min="0" class="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm tabular-nums" />
                             </label>
                         </div>
 
                         <p class="text-left text-sm font-semibold tabular-nums text-slate-900">
-                            {{ formatMoney(lineTotal(line)) }}
+                            {{ formatUsd(lineTotal(line)) }}
                         </p>
                     </li>
                 </ul>
@@ -301,7 +301,7 @@
                                     ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
                                     : 'border-slate-300 focus:border-blue-500 focus:ring-blue-100'"
                             />
-                            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-slate-400">ل.س</span>
+                            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-slate-400">$</span>
                         </div>
                     </Field>
                     <div class="flex flex-wrap gap-1.5 pb-1">
@@ -310,7 +310,7 @@
                             class="rounded-full border px-3 py-1 text-xs transition"
                             :class="paidIsFull ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-300 text-slate-600 hover:border-blue-400 hover:text-blue-600'"
                             @click="form.paid_now = totals.total.toFixed(2)"
-                        >دفع كامل ({{ formatMoney(totals.total) }})</button>
+                        >دفع كامل ({{ formatUsd(totals.total) }})</button>
                         <button
                             type="button"
                             class="rounded-full border px-3 py-1 text-xs transition"
@@ -323,7 +323,7 @@
                             <span class="text-red-600">المبلغ أكبر من إجمالي الفاتورة.</span>
                         </template>
                         <template v-else-if="paidNow > 0">
-                            يتبقّى <strong class="tabular-nums text-slate-800">{{ formatMoney(Math.max(0, totals.total - paidNow)) }}</strong>
+                            يتبقّى <strong class="tabular-nums text-slate-800">{{ formatUsd(Math.max(0, totals.total - paidNow)) }}</strong>
                             — يُسجَّل سند القبض عند ترحيل الفاتورة.
                         </template>
                         <template v-else>
@@ -337,22 +337,22 @@
         <div v-if="error" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ error }}</div>
 
         <!-- شريط ملتصق: المجموع والحفظ يبقيان في المتناول مهما طالت الفاتورة -->
-        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:ps-64">
+        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:ps-[var(--sidebar-w,16rem)]">
             <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div class="text-sm">
-                    <div class="flex items-center gap-4 text-slate-500">
-                        <span>المجموع <b class="tabular-nums text-slate-800">{{ formatMoney(totals.subtotal) }}</b></span>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-slate-500">
+                        <span>المجموع <b class="tabular-nums text-slate-800">{{ formatUsd(totals.subtotal) }}</b></span>
                         <span v-if="totals.discount_amount > 0">
-                            الخصم <b class="tabular-nums text-red-600">−{{ formatMoney(totals.discount_amount) }}</b>
+                            الخصم <b class="tabular-nums text-red-600">−{{ formatUsd(totals.discount_amount) }}</b>
                         </span>
                         <span v-if="paidNow > 0">
-                            المدفوع <b class="tabular-nums text-emerald-700">{{ formatMoney(paidNow) }}</b>
+                            المدفوع <b class="tabular-nums text-emerald-700">{{ formatUsd(paidNow) }}</b>
                         </span>
                     </div>
                     <div class="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
-                        الإجمالي {{ formatMoney(totals.total) }}
+                        الإجمالي {{ formatUsd(totals.total) }}
                         <span v-if="paidNow > 0 && !overPaid" class="text-sm font-medium text-slate-500">
-                            · يتبقّى {{ formatMoney(Math.max(0, totals.total - paidNow)) }}
+                            · يتبقّى {{ formatUsd(Math.max(0, totals.total - paidNow)) }}
                         </span>
                     </div>
                 </div>
@@ -401,7 +401,8 @@ import SalePostModal from '../../components/sales/SalePostModal.vue';
 import { salesApi, servicesApi, materialsApi } from '../../services/api';
 import { usePermissions } from '../../composables/usePermissions';
 import { useToast } from '../../composables/useToast';
-import { apiFieldErrors, apiMessage, formatMoney, formatQty, isoDate } from '../../utils/format';
+import { apiFieldErrors, apiMessage, formatUsd, formatQty, isoDate } from '../../utils/format';
+import { BASE_SYMBOL } from '../../constants/currency';
 
 const route = useRoute();
 const router = useRouter();
@@ -694,7 +695,7 @@ function onPosted(invoice) {
 
     // ما يريد البائع سماعه بعد الترحيل هو حال المال: مسدَّدة، أم بقي منها كم.
     if (paid > 0 && remaining <= 0) toast.success(`تم ترحيل الفاتورة${no} مسدَّدةً بالكامل`);
-    else if (paid > 0) toast.success(`تم ترحيل الفاتورة${no} — قُبض ${formatMoney(paid)} وتبقّى ${formatMoney(remaining)}`);
+    else if (paid > 0) toast.success(`تم ترحيل الفاتورة${no} — قُبض ${formatUsd(paid)} وتبقّى ${formatUsd(remaining)}`);
     else toast.success(`تم ترحيل الفاتورة${no} وخُصم المخزون وقُيّدت على العميل`);
 
     router.replace({ name: 'sales' });
@@ -720,13 +721,12 @@ function leaveWithoutPosting() {
 
 onMounted(async () => {
     try {
-        const [serviceList, materialList] = await Promise.all([
-            servicesApi.index({ per_page: 500 }),
-            materialsApi.index({ per_page: 500 }),
-        ]);
+        const servicePromise = servicesApi.index({ per_page: 500 }).catch(() => ({ data: [] }));
+        const materialPromise = materialsApi.index({ per_page: 500 }).catch(() => ({ data: [] }));
+        const [serviceList, materialList] = await Promise.all([servicePromise, materialPromise]);
 
-        services.value = serviceList.data ?? serviceList;
-        materials.value = materialList.data ?? materialList;
+        services.value = serviceList.data ?? serviceList ?? [];
+        materials.value = materialList.data ?? materialList ?? [];
     } catch (e) {
         error.value = apiMessage(e, 'تعذّر تحميل القوائم');
     }

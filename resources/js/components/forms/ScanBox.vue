@@ -15,7 +15,7 @@
                     :aria-controls="listboxId"
                     autocomplete="off"
                     :placeholder="placeholder"
-                    class="w-full rounded-xl border-2 border-slate-300 bg-white py-3 pe-3 ps-10 text-sm transition focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                    class="w-full rounded-xl border-2 border-slate-300 bg-white py-3 pe-9 ps-10 text-sm transition focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
                     @keydown.enter.prevent="onEnter"
                     @keydown.down.prevent="move(1)"
                     @keydown.up.prevent="move(-1)"
@@ -27,7 +27,7 @@
                     v-if="term"
                     type="button"
                     aria-label="مسح الحقل"
-                    class="absolute inset-y-0 end-2 flex items-center px-1 text-slate-400 transition hover:text-slate-700"
+                    class="absolute inset-y-0 end-1 flex w-8 items-center justify-center text-slate-400 transition hover:text-slate-700"
                     @click="reset(true)"
                 >
                     ✕
@@ -103,7 +103,7 @@
                         {{ row.kind === 'SERVICE' ? 'خدمة' : 'مادة' }}
                     </span>
                     <span class="truncate font-medium text-slate-900">{{ row.name }}</span>
-                    <span v-if="row.code" class="shrink-0 text-xs text-slate-400" dir="ltr">{{ row.code }}</span>
+                    <span v-if="row.code" class="hidden shrink-0 text-xs text-slate-400 sm:inline" dir="ltr">{{ row.code }}</span>
                 </span>
                 <span class="flex shrink-0 items-center gap-3 text-xs">
                     <span v-if="showStock && row.kind === 'MATERIAL'" :class="stockTone(row.stock)">
@@ -251,12 +251,13 @@ async function search() {
     if (query.length < 2) return;
 
     try {
-        const [materials, services] = await Promise.all([
-            materialsApi.index({ search: query, is_active: 1, per_page: 8 }),
-            props.includeServices
-                ? servicesApi.index({ search: query, per_page: 5 })
-                : Promise.resolve({ data: [] }),
-        ]);
+        const materialsPromise = materialsApi.index({ search: query, is_active: 1, per_page: 15 })
+            .catch(() => ({ data: [] }));
+        const servicesPromise = props.includeServices
+            ? servicesApi.index({ search: query, per_page: 10 }).catch(() => ({ data: [] }))
+            : Promise.resolve({ data: [] });
+
+        const [materials, services] = await Promise.all([materialsPromise, servicesPromise]);
 
         results.value = [
             ...(materials.data ?? []).map((m) => ({

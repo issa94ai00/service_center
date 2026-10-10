@@ -40,10 +40,10 @@
             <tr><td class="desc" colspan="2">{{ $index + 1 }}. {{ $line['description'] }}</td></tr>
             <tr>
                 <td class="muted">
-                    <span class="ltr">{{ $line['quantity'] }} × {{ $line['unit_price'] }}</span>
+                    <span class="ltr">{{ $line['quantity'] }} × {{ $line['unit_price'] }} {{ $company['currency'] }}</span>
                     @if($line['unit']) {{ $line['unit'] }}@endif
                 </td>
-                <td class="num">{{ $line['line_total'] }}</td>
+                <td class="num">{{ $line['line_total'] }} {{ $company['currency'] }}</td>
             </tr>
         @empty
             <tr><td colspan="2" class="center muted">لا توجد بنود</td></tr>
@@ -55,12 +55,16 @@
 
 <table class="kv">
     @if($totals['has_discount'])
-        <tr><td class="k">المجموع</td><td class="v">{{ $totals['subtotal'] }}</td></tr>
-        <tr><td class="k">الخصم</td><td class="v">{{ $totals['discount'] }}</td></tr>
+        <tr><td class="k">المجموع</td><td class="v">{{ $totals['subtotal'] }} {{ $company['currency'] }}</td></tr>
+        <tr><td class="k">الخصم</td><td class="v">{{ $totals['discount'] }} {{ $company['currency'] }}</td></tr>
     @endif
     <tr class="grand"><td class="k">الإجمالي</td><td class="v">{{ $totals['total'] }} {{ $company['currency'] }}</td></tr>
-    <tr><td class="k">المدفوع</td><td class="v">{{ $totals['paid'] }}</td></tr>
-    <tr><td class="k">المتبقي</td><td class="v"><strong>{{ $totals['remaining'] }}</strong></td></tr>
+    <tr><td class="k">المدفوع</td><td class="v">{{ $totals['paid'] }} {{ $company['currency'] }}</td></tr>
+    <tr><td class="k">المتبقي</td><td class="v"><strong>{{ $totals['remaining'] }} {{ $company['currency'] }}</strong></td></tr>
+    @foreach($totals['equivalents'] as $equivalent)
+        <tr><td class="k">{{ $equivalent['remaining'] ? 'المتبقي' : 'الإجمالي' }} بـ{{ $equivalent['name'] }}</td><td class="v">{{ $equivalent['remaining'] ?? $equivalent['total'] }} {{ $equivalent['symbol'] }}</td></tr>
+        <tr><td class="k small">سعر الصرف</td><td class="v small">{{ $equivalent['rate'] }}</td></tr>
+    @endforeach
 </table>
 
 @if($invoice->notes)

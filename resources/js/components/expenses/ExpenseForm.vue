@@ -3,29 +3,21 @@
         <div class="grid gap-4 sm:grid-cols-6">
             <!-- المبلغ أولاً وأكبر: هو الرقم الذي جاء المستخدم ليكتبه، وكل ما
                  عداه إمّا افتراضي جاهز أو ضغطة واحدة. -->
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-3">
                 <Field label="المبلغ" required>
-                    <div class="relative">
-                        <input
-                            ref="amountInput"
-                            v-model="form.amount"
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            inputmode="decimal"
-                            placeholder="0.00"
-                            class="w-full rounded-lg border px-3 py-2 pe-14 text-lg font-bold tabular-nums focus:outline-none focus:ring-2"
-                            :class="errors.amount ? INVALID_FIELD : VALID_FIELD"
-                        />
-                        <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-slate-400">
-                            {{ CURRENCY }}
-                        </span>
-                    </div>
-                    <p v-if="errors.amount" class="mt-1 text-xs text-red-600">{{ errors.amount }}</p>
+                    <CurrencyAmountField
+                        ref="amountInput"
+                        v-model:amount="form.amount"
+                        v-model:currency-code="form.currency_code"
+                        v-model:currency-amount="form.currency_amount"
+                        v-model:exchange-rate="form.exchange_rate"
+                        :invalid="Boolean(amountError)"
+                    />
+                    <p v-if="amountError" class="mt-1 text-xs text-red-600">{{ amountError }}</p>
                 </Field>
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-3">
                 <Field label="طريقة الدفع">
                     <div class="grid grid-cols-3 gap-1 rounded-lg border border-slate-300 p-0.5">
                         <button
@@ -45,13 +37,13 @@
                 </Field>
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-6">
                 <Field label="تاريخ الصرف">
                     <div class="flex gap-1.5">
                         <input
                             v-model="form.expense_date"
                             type="date"
-                            class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                            class="w-full min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2"
                             :class="errors.expense_date ? INVALID_FIELD : VALID_FIELD"
                         />
                         <!-- أغلب المصاريف تُسجَّل يوم صرفها أو في اليوم التالي،
@@ -209,6 +201,9 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import Field from '../ui/FormField.vue';
+import CurrencyAmountField from '../forms/CurrencyAmountField.vue';
+import { formatIn, useCurrencies } from '../../composables/useCurrencies';
+import { BASE_SYMBOL } from '../../constants/currency';
 import { expensesApi } from '../../services/api';
 import { PAYMENT_METHODS, paymentMethodLabel } from '../../constants/paymentMethods';
 import { apiFieldErrors, apiMessage, formatMoney, isoDate, toLatinDigits } from '../../utils/format';
@@ -225,7 +220,7 @@ const props = defineProps({
 
 const emit = defineEmits(['saved', 'close', 'manage-categories']);
 
-const CURRENCY = 'ل.س';
+const CURRENCY = BASE_SYMBOL;
 const VALID_FIELD = 'border-slate-300 focus:border-blue-500 focus:ring-blue-100';
 const INVALID_FIELD = 'border-red-300 focus:border-red-500 focus:ring-red-100';
 /** كم باباً يبقى ظاهراً قبل أن يُطوى الباقي خلف زرّ. */
@@ -247,6 +242,11 @@ const showAllCategories = ref(false);
 const form = reactive({
     expense_category_id: props.expense?.expense_category_id ?? '',
     amount: props.expense?.amount ?? '',
+    // `amount` is USD; an expense paid in another currency keeps what was paid
+    // and the rate alongside it.
+    currency_code: props.expense?.currency_code ?? 'USD',
+    currency_amount: props.expense && props.expense.currency_code !== 'USD' ? props.expense.currency_amount : '',
+    exchange_rate: props.expense?.exchange_rate ?? '1',
     payment_method: props.expense?.payment_method ?? 'CASH',
     expense_date: props.expense?.expense_date ?? isoDate(),
     payee: props.expense?.payee ?? '',
@@ -272,6 +272,12 @@ const hiddenCategories = computed(() =>
     props.categories.filter((category) => !visibleCategories.value.some((shown) => shown.id === category.id))
 );
 
+const currencyStore = useCurrencies();
+const isForeignCurrency = computed(() => form.currency_code !== 'USD');
+const amountError = computed(
+    () => errors.value.amount || errors.value.currency_amount || errors.value.exchange_rate || errors.value.currency_code || ''
+);
+
 const amountCents = computed(() => Math.round((Number(toLatinDigits(form.amount)) || 0) * 100));
 
 const isFutureDate = computed(() => Boolean(form.expense_date) && form.expense_date > isoDate());
@@ -286,7 +292,11 @@ const blockedReason = computed(() => {
 const summaryLine = computed(() => {
     const category = props.categories.find((item) => item.id === form.expense_category_id);
 
-    return `سيُسجَّل ${formatMoney(amountCents.value / 100)} ${CURRENCY} · ${category?.name ?? ''} · ${paymentMethodLabel(form.payment_method)}`;
+    const money = isForeignCurrency.value
+        ? `${formatIn(form.currency_amount || 0, currencyStore.find(form.currency_code))} (= ${formatMoney(amountCents.value / 100)} ${CURRENCY})`
+        : `${formatMoney(amountCents.value / 100)} ${CURRENCY}`;
+
+    return `سيُسجَّل ${money} · ${category?.name ?? ''} · ${paymentMethodLabel(form.payment_method)}`;
 });
 
 // باب عُطِّل بينما الشاشة مفتوحة يسقط من القائمة؛ اختياره لا يجوز أن يبقى
@@ -306,6 +316,10 @@ function payload() {
     return {
         expense_category_id: Number(form.expense_category_id),
         amount: (amountCents.value / 100).toFixed(2),
+        currency_code: form.currency_code,
+        ...(isForeignCurrency.value
+            ? { currency_amount: form.currency_amount, exchange_rate: form.exchange_rate }
+            : {}),
         payment_method: form.payment_method,
         expense_date: form.expense_date,
         payee: form.payee || null,
@@ -337,7 +351,9 @@ async function submit(again = false) {
         if (!isEdit.value && again) {
             // الباب والطريقة والتاريخ تبقى: من يُدخل فواتير الشهر يُدخلها
             // تحت الباب نفسه وفي الجلسة نفسها.
+            // The currency stays too — a batch of SYP bills is entered in SYP.
             form.amount = '';
+            form.currency_amount = '';
             form.payee = '';
             form.notes = '';
             await nextTick();
@@ -346,6 +362,11 @@ async function submit(again = false) {
     } catch (e) {
         error.value = apiMessage(e, 'تعذّر حفظ المصروف');
         errors.value = apiFieldErrors(e);
+
+        // The rate moved or the currency was switched off since the form opened.
+        const field = e?.response?.data?.field;
+        if (field) errors.value = { ...errors.value, [field]: error.value };
+        if (field === 'exchange_rate' || field === 'currency_code') currencyStore.refresh();
     } finally {
         saving.value = false;
     }

@@ -73,8 +73,8 @@
                 @if($showKind)<td>{{ $line['kind'] }}</td>@endif
                 <td>{{ $line['unit'] ?? '—' }}</td>
                 <td class="num">{{ $line['quantity'] }}</td>
-                <td class="num">{{ $line['unit_price'] }}</td>
-                <td class="num">{{ $line['line_total'] }}</td>
+                <td class="num">{{ $line['unit_price'] }} {{ $company['currency'] }}</td>
+                <td class="num">{{ $line['line_total'] }} {{ $company['currency'] }}</td>
             </tr>
         @empty
             <tr><td colspan="{{ $showKind ? 7 : 6 }}" style="text-align:center;color:#888;padding:6mm;">لا توجد بنود</td></tr>
@@ -98,12 +98,12 @@
             <table class="totals" width="100%">
                 <tr>
                     <td class="label">المجموع قبل الخصم</td>
-                    <td class="value">{{ $totals['subtotal'] }}</td>
+                    <td class="value">{{ $totals['subtotal'] }} {{ $company['currency'] }}</td>
                 </tr>
                 @if($totals['has_discount'])
                     <tr>
                         <td class="label">الخصم</td>
-                        <td class="value">{{ $totals['discount'] }}</td>
+                        <td class="value">{{ $totals['discount'] }} {{ $company['currency'] }}</td>
                     </tr>
                 @endif
                 <tr class="grand">
@@ -112,13 +112,32 @@
                 </tr>
                 <tr>
                     <td class="label">المدفوع</td>
-                    <td class="value">{{ $totals['paid'] }}</td>
+                    <td class="value">{{ $totals['paid'] }} {{ $company['currency'] }}</td>
                 </tr>
                 <tr>
                     <td class="label">المتبقي</td>
-                    <td class="value">{{ $totals['remaining'] }}</td>
+                    <td class="value">{{ $totals['remaining'] }} {{ $company['currency'] }}</td>
                 </tr>
+                @foreach($totals['equivalents'] as $equivalent)
+                    <tr>
+                        <td class="label">الإجمالي بـ{{ $equivalent['name'] }}</td>
+                        <td class="value">{{ $equivalent['total'] }} {{ $equivalent['symbol'] }}</td>
+                    </tr>
+                    @if($equivalent['remaining'])
+                        <tr>
+                            <td class="label">المتبقي بـ{{ $equivalent['name'] }}</td>
+                            <td class="value">{{ $equivalent['remaining'] }} {{ $equivalent['symbol'] }}</td>
+                        </tr>
+                    @endif
+                @endforeach
             </table>
+            @if($totals['equivalents']->isNotEmpty())
+                <div style="font-size:8pt;color:#64748b;margin-top:1mm;">
+                    @foreach($totals['equivalents'] as $equivalent)
+                        سعر الصرف: 1 {{ $company['currency'] }} = {{ $equivalent['rate'] }} {{ $equivalent['symbol'] }}@if(!$loop->last) — @endif
+                    @endforeach
+                </div>
+            @endif
         </td>
     </tr>
 </table>

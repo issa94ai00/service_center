@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\AccessLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CurrenciesController;
 use App\Http\Controllers\Api\CustomersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentPdfController;
@@ -30,9 +32,21 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
 
-    Route::middleware('permission:settings.manage')->group(function () {
+    Route::get('/features', [SettingsController::class, 'features']);
+    // features.manage alone reaches only the feature switches (filtered in the controller).
+    Route::middleware('permission:settings.manage,features.manage')->group(function () {
         Route::get('/settings', [SettingsController::class, 'index']);
         Route::put('/settings', [SettingsController::class, 'update']);
+    });
+
+    // Active currencies and their rates, for every form that takes money.
+    Route::get('/currencies/options', [CurrenciesController::class, 'options']);
+    Route::middleware('permission:currencies.manage')->group(function () {
+        Route::get('/currencies', [CurrenciesController::class, 'index']);
+        Route::post('/currencies', [CurrenciesController::class, 'store']);
+        Route::put('/currencies/{currency}', [CurrenciesController::class, 'update']);
+        Route::delete('/currencies/{currency}', [CurrenciesController::class, 'destroy']);
+        Route::get('/currencies/{currency}/rates', [CurrenciesController::class, 'rates']);
     });
 
     Route::middleware('permission:users.manage')->group(function () {
@@ -44,19 +58,35 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     });
 
     Route::middleware('permission:users.manage')->group(function () {
+        Route::get('/roles/options', [RolesController::class, 'options']);
+    });
+
+    // Roles and Permissions management. Master always passes; a delegated roles.manage
+    // holder is limited by AccessControlService to roles within their own permissions.
+    Route::middleware('permission:roles.manage')->group(function () {
         Route::get('/roles', [RolesController::class, 'index']);
+        Route::post('/roles', [RolesController::class, 'store']);
         Route::get('/roles/{role}', [RolesController::class, 'show']);
+        Route::put('/roles/{role}', [RolesController::class, 'update']);
+        Route::delete('/roles/{role}', [RolesController::class, 'destroy']);
+        Route::post('/roles/{role}/users', [RolesController::class, 'assignUsers']);
         Route::get('/permissions', [RolesController::class, 'permissionsIndex']);
     });
+
+    // History of role/permission/user changes; each holder sees the part they manage.
+    Route::get('/access-log', [AccessLogController::class, 'index'])
+        ->middleware('permission:roles.manage,users.manage');
 
     Route::apiResource('/customers', CustomersController::class)
         ->parameters(['customers' => 'customer']);
     Route::apiResource('/suppliers', SuppliersController::class)
         ->parameters(['suppliers' => 'supplier']);
 
-    Route::get('/technicians/options', [TechniciansController::class, 'options']);
-    Route::apiResource('/technicians', TechniciansController::class)
-        ->parameters(['technicians' => 'technician']);
+    Route::middleware('feature:technicians')->group(function () {
+        Route::get('/technicians/options', [TechniciansController::class, 'options']);
+        Route::apiResource('/technicians', TechniciansController::class)
+            ->parameters(['technicians' => 'technician']);
+    });
 
     Route::middleware('permission:statements.view')->group(function () {
         Route::get('/customers/{customer}/statement', [StatementsController::class, 'customer']);
@@ -79,7 +109,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/sample', [DocumentPdfController::class, 'sample']);
     });
 
-    Route::prefix('inventory')->group(function () {
+    Route::middleware('feature:inventory')->prefix('inventory')->group(function () {
         Route::middleware('permission:inventory.view')->group(function () {
             Route::get('/', [InventoryController::class, 'index']);
             Route::get('/adjustments', [InventoryController::class, 'adjustments']);
@@ -96,33 +126,42 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
     });
 
-    Route::middleware('permission:reports.view')->prefix('reports')->group(function () {
+    Route::middleware(['permission:reports.view', 'feature:reports'])->prefix('reports')->group(function () {
         Route::get('/low-stock', [ReportsController::class, 'lowStock']);
         Route::get('/sales-summary', [ReportsController::class, 'salesSummary']);
         Route::get('/purchases-summary', [ReportsController::class, 'purchasesSummary']);
+        Route::get('/profit-summary', [ReportsController::class, 'profitSummary']);
         Route::get('/receivables', [ReportsController::class, 'receivables']);
         Route::get('/payables', [ReportsController::class, 'payables']);
         Route::get('/stock-movements', [ReportsController::class, 'stockMovements']);
-        Route::get('/technician-summary', [ReportsController::class, 'technicianSummary']);
-        Route::get('/technician-repairs', [ReportsController::class, 'technicianRepairs']);
+        // Technician reports: their own permission on top of reports.view, and only
+        // while the technicians module is switched on.
+        Route::get('/technician-summary', [ReportsController::class, 'technicianSummary'])
+            ->middleware(['permission:reports.technicians', 'feature:technicians']);
+        Route::get('/technician-repairs', [ReportsController::class, 'technicianRepairs'])
+            ->middleware(['permission:reports.technician_repairs', 'feature:technicians']);
     });
 
-    Route::get('/service-units/options', [ServiceUnitsController::class, 'options']);
-    Route::apiResource('/service-units', ServiceUnitsController::class)
-        ->parameters(['service_unit' => 'service_unit']);
-    Route::apiResource('/services', ServicesController::class)
-        ->parameters(['service' => 'service']);
-    Route::post('/services/{service}/restore', [ServicesController::class, 'restore'])->withTrashed();
-    Route::delete('/services/{service}/force', [ServicesController::class, 'forceDelete'])->withTrashed();
+    Route::middleware('feature:services')->group(function () {
+        Route::get('/service-units/options', [ServiceUnitsController::class, 'options']);
+        Route::apiResource('/service-units', ServiceUnitsController::class)
+            ->parameters(['service_unit' => 'service_unit']);
+        Route::apiResource('/services', ServicesController::class)
+            ->parameters(['service' => 'service']);
+        Route::post('/services/{service}/restore', [ServicesController::class, 'restore'])->withTrashed();
+        Route::delete('/services/{service}/force', [ServicesController::class, 'forceDelete'])->withTrashed();
+    });
 
-    Route::get('/repairs/customer-options', [RepairsController::class, 'customerOptions']);
-    Route::get('/repairs/brand-options', [RepairsController::class, 'brandOptions']);
-    Route::get('/repairs/customer-account', [RepairsController::class, 'customerAccount']);
-    Route::get('/repairs/{repair}/settlement', [RepairsController::class, 'settlement']);
-    Route::post('/repairs/{repair}/deposit', [RepairsController::class, 'deposit']);
-    Route::post('/repairs/{repair}/settle', [RepairsController::class, 'settle']);
-    Route::apiResource('/repairs', RepairsController::class)
-        ->parameters(['repair' => 'repair']);
+    Route::middleware('feature:repairs')->group(function () {
+        Route::get('/repairs/customer-options', [RepairsController::class, 'customerOptions']);
+        Route::get('/repairs/brand-options', [RepairsController::class, 'brandOptions']);
+        Route::get('/repairs/customer-account', [RepairsController::class, 'customerAccount']);
+        Route::get('/repairs/{repair}/settlement', [RepairsController::class, 'settlement']);
+        Route::post('/repairs/{repair}/deposit', [RepairsController::class, 'deposit']);
+        Route::post('/repairs/{repair}/settle', [RepairsController::class, 'settle']);
+        Route::apiResource('/repairs', RepairsController::class)
+            ->parameters(['repair' => 'repair']);
+    });
 
     Route::get('/material-categories/options', [MaterialCategoriesController::class, 'options']);
     Route::apiResource('/material-categories', MaterialCategoriesController::class)
@@ -133,30 +172,36 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/materials/{material}/restore', [MaterialsController::class, 'restore'])->withTrashed();
     Route::delete('/materials/{material}/force', [MaterialsController::class, 'forceDelete'])->withTrashed();
 
-    Route::get('/purchases/supplier-options', [PurchasesController::class, 'supplierOptions']);
-    Route::get('/purchases/price-suggestions', [PurchasesController::class, 'priceSuggestions']);
-    Route::apiResource('/purchases', PurchasesController::class)
-        ->parameters(['purchase' => 'purchase']);
-    Route::post('/purchases/{purchase}/post', [PurchasesController::class, 'post']);
-    Route::post('/purchases/{purchase}/cancel', [PurchasesController::class, 'cancel']);
+    Route::middleware('feature:purchases')->group(function () {
+        Route::get('/purchases/supplier-options', [PurchasesController::class, 'supplierOptions']);
+        Route::get('/purchases/price-suggestions', [PurchasesController::class, 'priceSuggestions']);
+        Route::apiResource('/purchases', PurchasesController::class)
+            ->parameters(['purchase' => 'purchase']);
+        Route::post('/purchases/{purchase}/post', [PurchasesController::class, 'post']);
+        Route::post('/purchases/{purchase}/cancel', [PurchasesController::class, 'cancel']);
+    });
 
-    Route::get('/sales/customer-options', [SalesController::class, 'customerOptions']);
-    Route::apiResource('/sales', SalesController::class)
-        ->parameters(['sale' => 'sale']);
-    Route::post('/sales/{sale}/post', [SalesController::class, 'post']);
-    Route::post('/sales/{sale}/cancel', [SalesController::class, 'cancel']);
+    Route::middleware('feature:sales')->group(function () {
+        Route::get('/sales/customer-options', [SalesController::class, 'customerOptions']);
+        Route::apiResource('/sales', SalesController::class)
+            ->parameters(['sale' => 'sale']);
+        Route::post('/sales/{sale}/post', [SalesController::class, 'post']);
+        Route::post('/sales/{sale}/cancel', [SalesController::class, 'cancel']);
+    });
 
     // مصاريف الصندوق: لا مسودة لها ولا تخصيص، فليس لها إلا التسجيل والتصحيح
     // والإلغاء المُعلَّل.
-    Route::get('/expense-categories', [ExpenseCategoriesController::class, 'index']);
-    Route::post('/expense-categories', [ExpenseCategoriesController::class, 'store']);
-    Route::put('/expense-categories/{expense_category}', [ExpenseCategoriesController::class, 'update']);
-    Route::delete('/expense-categories/{expense_category}', [ExpenseCategoriesController::class, 'destroy']);
+    Route::middleware('feature:expenses')->group(function () {
+        Route::get('/expense-categories', [ExpenseCategoriesController::class, 'index']);
+        Route::post('/expense-categories', [ExpenseCategoriesController::class, 'store']);
+        Route::put('/expense-categories/{expense_category}', [ExpenseCategoriesController::class, 'update']);
+        Route::delete('/expense-categories/{expense_category}', [ExpenseCategoriesController::class, 'destroy']);
 
-    Route::apiResource('/expenses', ExpensesController::class)
-        ->parameters(['expenses' => 'expense'])
-        ->except(['destroy']);
-    Route::post('/expenses/{expense}/cancel', [ExpensesController::class, 'cancel']);
+        Route::apiResource('/expenses', ExpensesController::class)
+            ->parameters(['expenses' => 'expense'])
+            ->except(['destroy']);
+        Route::post('/expenses/{expense}/cancel', [ExpensesController::class, 'cancel']);
+    });
 
     Route::get('/payments/open-invoices', [PaymentsController::class, 'openInvoices']);
     Route::apiResource('/payments', PaymentsController::class)

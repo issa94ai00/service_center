@@ -63,7 +63,7 @@ class RepairSettlementService
         $invoice = $repair->salesInvoice;
 
         return [
-            'currency' => Setting::get('currency_symbol', 'ل.س'),
+            'currency' => Setting::get('currency_symbol', '$'),
             'estimated_cost' => $repair->estimated_cost,
             'final_cost' => $repair->final_cost,
             // What the customer is being charged right now: the agreed price if

@@ -12,7 +12,7 @@
             </div>
             <div class="rounded-xl border border-slate-200 p-4">
                 <div class="text-xs text-slate-500">تكلفة إعادة التعبئة التقديرية</div>
-                <div class="mt-1 text-2xl font-bold tabular-nums text-slate-900">{{ formatMoney(refillCost) }}</div>
+                <div class="mt-1 text-2xl font-bold tabular-nums text-slate-900">{{ formatUsd(refillCost) }}</div>
                 <div class="mt-0.5 text-[11px] text-slate-400">النقص × سعر التكلفة</div>
             </div>
         </div>
@@ -71,8 +71,8 @@
                         <td class="px-4 py-3 text-left font-medium tabular-nums text-amber-700">
                             {{ formatQty(material.shortfall) }}
                         </td>
-                        <td class="px-4 py-3 text-left tabular-nums text-slate-600">{{ formatMoney(material.cost_price) }}</td>
-                        <td class="px-4 py-3 text-left tabular-nums text-slate-600">{{ formatMoney(material.sale_price) }}</td>
+                        <td class="px-4 py-3 text-left tabular-nums text-slate-600">{{ formatUsd(material.cost_price) }}</td>
+                        <td class="px-4 py-3 text-left tabular-nums text-slate-600">{{ formatUsd(material.sale_price) }}</td>
                         <td class="px-4 py-3 print:hidden">
                             <!-- Coverage against the minimum: the shortfall column read as a picture. -->
                             <div class="flex items-center gap-2">
@@ -91,7 +91,7 @@
 
 <script setup>
 import { computed, reactive } from 'vue';
-import { formatMoney, formatQty } from '../../utils/format';
+import { formatUsd, formatQty } from '../../utils/format';
 
 const props = defineProps({
     rows: { type: Array, default: () => [] },

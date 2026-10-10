@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Payment extends Model
 {
     protected $fillable = [
-        'payment_type', 'customer_id', 'supplier_id', 'technician_id', 'repair_id', 'amount', 'payment_method',
+        'payment_type', 'customer_id', 'supplier_id', 'technician_id', 'repair_id', 'amount',
+        'currency_code', 'exchange_rate', 'currency_amount', 'payment_method',
         'reference_no', 'payment_date', 'status', 'notes', 'recorded_by',
         'posted_by', 'posted_at', 'cancelled_by', 'cancelled_at', 'cancellation_reason',
     ];
@@ -25,6 +26,8 @@ class Payment extends Model
             'payment_method' => PaymentMethod::class,
             'status' => DocumentStatus::class,
             'amount' => 'decimal:2',
+            'exchange_rate' => 'decimal:6',
+            'currency_amount' => 'decimal:2',
             'payment_date' => 'date',
             'posted_at' => 'datetime',
             'cancelled_at' => 'datetime',

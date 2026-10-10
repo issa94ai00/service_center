@@ -1,7 +1,8 @@
 <template>
     <div>
         <!-- الملخّص: صف لكل خبير -->
-        <table v-if="kind === 'technicians'" class="w-full text-right text-sm">
+        <div v-if="kind === 'technicians'" class="overflow-x-auto">
+        <table class="w-full min-w-[860px] text-right text-sm">
             <thead class="bg-slate-50 text-xs font-semibold text-slate-500">
                 <tr>
                     <th class="px-4 py-3">الخبير</th>
@@ -32,16 +33,16 @@
                         {{ formatPercent(row.commission_rate / 100) }}
                     </td>
                     <td class="px-4 py-3 text-left tabular-nums text-slate-700">{{ row.repairs_count }}</td>
-                    <td class="px-4 py-3 text-left tabular-nums text-slate-700">{{ formatMoney(row.revenue) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums text-slate-700">{{ formatUsd(row.revenue) }}</td>
                     <td class="px-4 py-3 text-left tabular-nums font-medium text-slate-900">
-                        {{ formatMoney(row.commission) }}
+                        {{ formatUsd(row.commission) }}
                     </td>
-                    <td class="px-4 py-3 text-left tabular-nums text-slate-700">{{ formatMoney(row.paid) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums text-slate-700">{{ formatUsd(row.paid) }}</td>
                     <td
                         class="px-4 py-3 text-left font-semibold tabular-nums"
                         :class="balanceTone(row.balance)"
                     >
-                        {{ formatMoney(row.balance) }}
+                        {{ formatUsd(row.balance) }}
                     </td>
                 </tr>
             </tbody>
@@ -49,18 +50,20 @@
                 <tr>
                     <td class="px-4 py-3" colspan="3">الإجمالي — {{ totals.technicians }} خبير</td>
                     <td class="px-4 py-3 text-left tabular-nums">{{ totals.repairs_count }}</td>
-                    <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(totals.revenue) }}</td>
-                    <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(totals.commission) }}</td>
-                    <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(totals.paid) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(totals.revenue) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(totals.commission) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(totals.paid) }}</td>
                     <td class="px-4 py-3 text-left tabular-nums" :class="balanceTone(totals.balance)">
-                        {{ formatMoney(totals.balance) }}
+                        {{ formatUsd(totals.balance) }}
                     </td>
                 </tr>
             </tfoot>
         </table>
+        </div>
 
         <!-- التفصيل: صف لكل بلاغ مسوّى -->
-        <table v-else class="w-full text-right text-sm">
+        <div v-else class="overflow-x-auto">
+        <table class="w-full min-w-[860px] text-right text-sm">
             <thead class="bg-slate-50 text-xs font-semibold text-slate-500">
                 <tr>
                     <th class="px-4 py-3">الإيصال</th>
@@ -87,24 +90,25 @@
                     <td class="px-4 py-3 text-slate-700">{{ row.technician || '—' }}</td>
                     <td class="px-4 py-3 text-slate-600">{{ row.customer || '—' }}</td>
                     <td class="px-4 py-3 text-slate-600">{{ row.device }}</td>
-                    <td class="px-4 py-3 text-left tabular-nums text-slate-700">{{ formatMoney(row.final_cost) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums text-slate-700">{{ formatUsd(row.final_cost) }}</td>
                     <td class="px-4 py-3 text-left tabular-nums text-slate-500">
                         {{ formatPercent(row.commission_rate / 100) }}
                     </td>
                     <td class="px-4 py-3 text-left font-semibold tabular-nums text-slate-900">
-                        {{ formatMoney(row.commission_amount) }}
+                        {{ formatUsd(row.commission_amount) }}
                     </td>
                 </tr>
             </tbody>
             <tfoot class="border-t-2 border-slate-200 bg-slate-50 text-sm font-semibold">
                 <tr>
                     <td class="px-4 py-3" colspan="5">الإجمالي — {{ totals.repairs_count }} بلاغ</td>
-                    <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(totals.revenue) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(totals.revenue) }}</td>
                     <td class="px-4 py-3"></td>
-                    <td class="px-4 py-3 text-left tabular-nums">{{ formatMoney(totals.commission) }}</td>
+                    <td class="px-4 py-3 text-left tabular-nums">{{ formatUsd(totals.commission) }}</td>
                 </tr>
             </tfoot>
         </table>
+        </div>
     </div>
 </template>
 
@@ -112,7 +116,7 @@
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import { usePermissions } from '../../composables/usePermissions';
-import { formatMoney, formatPercent } from '../../utils/format';
+import { formatUsd, formatPercent } from '../../utils/format';
 
 const props = defineProps({
     data: { type: Object, default: null },

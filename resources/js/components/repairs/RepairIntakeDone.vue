@@ -105,7 +105,7 @@ const { can } = usePermissions();
 // Mirrors the policies behind the two PDF endpoints, so a clerk is never
 // offered a button that answers 403.
 const canPrintReceipt = computed(() => can('repairs.view'));
-const canPrintPayment = computed(() => can('payments.create') || can('statements.view'));
+const canPrintPayment = computed(() => can('payments.view') || can('statements.view'));
 
 const paid = computed(() => Number(props.repair.paid ?? 0));
 const due = computed(() => Number(props.repair.due ?? 0));

@@ -305,7 +305,7 @@ class TechnicianTest extends TestCase
         $technician = Technician::factory()->rate('25.00')->create(['name' => 'سامر']);
         $repair = $this->openRepair($technician);
 
-        $this->actingAs($this->userWith(['repairs.settle', 'payments.create', 'payments.confirm', 'reports.view']));
+        $this->actingAs($this->userWith(['repairs.settle', 'payments.create', 'payments.confirm', 'reports.view', 'reports.technicians']));
         $this->postJson("/api/repairs/{$repair->id}/settle", ['total' => '80000'])->assertOk();
 
         $payment = $this->postJson('/api/payments', [
@@ -333,7 +333,7 @@ class TechnicianTest extends TestCase
         $technician = Technician::factory()->rate('25.00')->create();
         $repair = $this->openRepair($technician);
 
-        $this->actingAs($this->userWith(['repairs.settle', 'reports.view']));
+        $this->actingAs($this->userWith(['repairs.settle', 'reports.view', 'reports.technicians']));
         $this->postJson("/api/repairs/{$repair->id}/settle", ['total' => '80000'])->assertOk();
 
         $row = $this->getJson('/api/reports/technician-summary?from=2026-06-01&to=2026-06-30')
@@ -352,7 +352,7 @@ class TechnicianTest extends TestCase
         $first = $this->openRepair($technician);
         $second = $this->openRepair($technician);
 
-        $this->actingAs($this->userWith(['repairs.settle', 'reports.view']));
+        $this->actingAs($this->userWith(['repairs.settle', 'reports.view', 'reports.technician_repairs']));
         $this->postJson("/api/repairs/{$first->id}/settle", ['total' => '80000'])->assertOk();
         $this->postJson("/api/repairs/{$second->id}/settle", ['total' => '40000'])->assertOk();
 
@@ -371,11 +371,36 @@ class TechnicianTest extends TestCase
         $technician = Technician::factory()->create();
         $this->openRepair($technician);
 
-        $this->actingAs($this->userWith(['reports.view']));
+        $this->actingAs($this->userWith(['reports.view', 'reports.technician_repairs']));
 
         $this->getJson('/api/reports/technician-repairs')
             ->assertOk()
             ->assertJsonPath('data.totals.repairs_count', '0');
+    }
+
+    public function test_each_technician_report_needs_its_own_permission(): void
+    {
+        $this->actingAs($this->userWith(['reports.view']));
+        $this->getJson('/api/reports/technician-summary')->assertForbidden();
+        $this->getJson('/api/reports/technician-repairs')->assertForbidden();
+
+        $this->actingAs($this->userWith(['reports.view', 'reports.technicians']));
+        $this->getJson('/api/reports/technician-summary')->assertOk();
+        $this->getJson('/api/reports/technician-repairs')->assertForbidden();
+
+        $this->actingAs($this->userWith(['reports.view', 'reports.technician_repairs']));
+        $this->getJson('/api/reports/technician-summary')->assertForbidden();
+        $this->getJson('/api/reports/technician-repairs')->assertOk();
+    }
+
+    public function test_the_technician_reports_close_with_the_technicians_feature(): void
+    {
+        Setting::query()->updateOrCreate(['key' => 'feature_technicians'], ['value' => '0', 'group' => 'features', 'type' => 'bool']);
+
+        $this->actingAs($this->userWith(['reports.view', 'reports.technicians', 'reports.technician_repairs']));
+
+        $this->getJson('/api/reports/technician-summary')->assertForbidden();
+        $this->getJson('/api/reports/technician-repairs')->assertForbidden();
     }
 
     public function test_the_reports_require_the_reports_permission(): void

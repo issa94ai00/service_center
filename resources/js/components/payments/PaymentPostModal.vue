@@ -47,6 +47,7 @@
                 <p class="mt-3 text-2xl font-bold tabular-nums text-slate-900">
                     {{ formatMoney(doc.amount) }}
                     <span class="text-sm font-medium text-slate-500">{{ CURRENCY }}</span>
+                    <ForeignAmount :row="doc" class="!text-xs" />
                 </p>
                 <p class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                     <span>{{ methodLabel(doc.payment_method) }}</span>
@@ -158,6 +159,8 @@ import { useRouter } from 'vue-router';
 import BaseModal from '../ui/BaseModal.vue';
 import { paymentsApi } from '../../services/api';
 import { apiMessage, formatDate, formatMoney } from '../../utils/format';
+import ForeignAmount from '../ui/ForeignAmount.vue';
+import { BASE_SYMBOL } from '../../constants/currency';
 import { paymentMethodLabel } from '../../constants/paymentMethods';
 
 const props = defineProps({
@@ -168,7 +171,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'posted', 'stale']);
 
-const CURRENCY = 'ل.س';
+const CURRENCY = BASE_SYMBOL;
 
 const router = useRouter();
 const doc = ref(null);

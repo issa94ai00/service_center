@@ -28,6 +28,44 @@ export const settingsApi = {
         const { data } = await api.put('/settings', { values });
         return data;
     },
+
+    async features() {
+        const { data } = await api.get('/features');
+        return data.data ?? {};
+    },
+};
+
+export const currenciesApi = {
+    /** Active currencies with their current rate — any signed-in user. */
+    async options() {
+        const { data } = await api.get('/currencies/options');
+        return data.data ?? [];
+    },
+
+    async index() {
+        const { data } = await api.get('/currencies');
+        return data.data ?? [];
+    },
+
+    async store(payload) {
+        const { data } = await api.post('/currencies', payload);
+        return data;
+    },
+
+    async update(id, payload) {
+        const { data } = await api.put(`/currencies/${id}`, payload);
+        return data;
+    },
+
+    async destroy(id) {
+        const { data } = await api.delete(`/currencies/${id}`);
+        return data;
+    },
+
+    async rates(id) {
+        const { data } = await api.get(`/currencies/${id}/rates`);
+        return data.data ?? [];
+    },
 };
 
 export const usersApi = {
@@ -53,8 +91,58 @@ export const usersApi = {
 };
 
 export const rolesApi = {
+    async index(params = {}) {
+        const { data } = await api.get('/roles', { params });
+        return data;
+    },
+
+    async show(id) {
+        const { data } = await api.get(`/roles/${id}`);
+        return data;
+    },
+
+    async store(payload) {
+        const { data } = await api.post('/roles', payload);
+        return data;
+    },
+
+    async update(id, payload) {
+        const { data } = await api.put(`/roles/${id}`, payload);
+        return data;
+    },
+
+    async destroy(id) {
+        const { data } = await api.delete(`/roles/${id}`);
+        return data;
+    },
+
+    async assignUsers(id, userIds) {
+        const { data } = await api.post(`/roles/${id}/users`, { user_ids: userIds });
+        return data;
+    },
+
+    async permissions() {
+        const { data } = await api.get('/permissions');
+        return data;
+    },
+
+    async options() {
+        const { data } = await api.get('/roles/options');
+        return data;
+    },
+};
+
+export const accessLogApi = {
+    // params: { subject: 'role' | 'user', subject_id, page, per_page }
+    async index(params = {}) {
+        const { data } = await api.get('/access-log', { params });
+        return data;
+    },
+};
+
+export const permissionsApi = {
     async index() {
-        const { data } = await api.get('/roles');
+        const { data } = await api.get('/permissions');
         return data;
     },
 };
@@ -646,6 +734,11 @@ export const reportsApi = {
 
     async purchasesSummary(params = {}) {
         const { data } = await api.get('/reports/purchases-summary', { params });
+        return data.data;
+    },
+
+    async profitSummary(params = {}) {
+        const { data } = await api.get('/reports/profit-summary', { params });
         return data.data;
     },
 

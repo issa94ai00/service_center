@@ -31,6 +31,25 @@ class AdminUserSeeder extends Seeder
             $user->roles()->attach($adminRole->id);
         }
 
+        /** @var User $masterUser */
+        $masterUser = User::query()->firstOrCreate(
+            ['email' => 'master@damatech.sy'],
+            [
+                'name' => 'المدير العام (Master)',
+                'password' => Hash::make('master123'),
+                'is_active' => true,
+                'locale' => 'ar',
+            ]
+        );
+
+        $masterRole = Role::where('slug', 'master')->first();
+        if ($masterRole && ! $masterUser->roles()->where('role_id', $masterRole->id)->exists()) {
+            $masterUser->roles()->attach($masterRole->id);
+        }
+        if ($adminRole && ! $masterUser->roles()->where('role_id', $adminRole->id)->exists()) {
+            $masterUser->roles()->attach($adminRole->id);
+        }
+
         // When ADMIN_INITIAL_PASSWORD is absent a random one is generated above.
         // Printing it on creation is the only chance to learn it — otherwise the
         // account exists with a password nobody can recover.

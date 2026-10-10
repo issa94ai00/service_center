@@ -18,7 +18,7 @@
                 @click.self="requestClose"
             >
                 <div
-                    class="my-4 flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-8"
+                    class="flex max-h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)] w-full sm:max-h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-8"
                     :class="maxWidth"
                 >
                     <div class="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">

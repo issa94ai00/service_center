@@ -15,6 +15,7 @@ export const useAuthStore = defineStore('auth', {
             return state.user.roles.flatMap((role) => role.permissions.map((p) => p.slug));
         },
         roles: (state) => (state.user ? state.user.roles.map((r) => r.slug) : []),
+        isMaster: (state) => (state.user ? state.user.roles.some((r) => r.slug === 'master') : false),
     },
 
     actions: {
@@ -49,7 +50,12 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        hasRole(slug) {
+            return this.roles.includes(slug);
+        },
+
         hasPermission(slug) {
+            if (this.roles.includes('master')) return true;
             return this.permissions.includes(slug);
         },
     },

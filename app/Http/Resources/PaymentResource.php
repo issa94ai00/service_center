@@ -26,6 +26,10 @@ class PaymentResource extends JsonResource
             'is_repair' => $this->isRepairPayment(),
             'repair' => RepairLinkResource::make($this->whenLoaded('repair')),
             'amount' => $this->amount,
+            // `amount` is always USD; the three below say what actually changed hands.
+            'currency_code' => $this->currency_code ?? 'USD',
+            'exchange_rate' => $this->exchange_rate ?? '1.000000',
+            'currency_amount' => $this->currency_amount ?? $this->amount,
             'payment_method' => $this->payment_method,
             'payment_date' => $this->payment_date?->format('Y-m-d'),
             'status' => $this->status,

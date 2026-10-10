@@ -3,15 +3,19 @@
 namespace App\Services;
 
 use App\Enums\DocumentStatus;
+use App\Enums\PaymentType;
 use App\Models\Customer;
+use App\Models\Expense;
 use App\Models\Material;
 use App\Models\Payment;
 use App\Models\PurchaseInvoice;
 use App\Models\Repair;
 use App\Models\SalesInvoice;
+use App\Models\SalesInvoiceItem;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Technician;
+use App\Models\TechnicianTransaction;
 use App\Support\DateRange;
 use App\Support\Money;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -95,6 +99,339 @@ class ReportService
             $from,
             $to,
         );
+    }
+
+    /**
+     * Profit & Loss and profitability summary for a period.
+     *
+     * Aggregates posted sales revenue, cost of goods sold (COGS), operating
+     * expenses, technician commissions, gross/net profits, daily trends,
+     * cash flow metrics, and product profitability.
+     *
+     * @return array<string, mixed>
+     */
+    public function profitSummary(string $from, string $to): array
+    {
+        $dateRange = DateRange::between($from, $to);
+
+        // 1. Sales revenue breakdown
+        $salesTotals = SalesInvoice::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('invoice_date', $dateRange)
+            ->selectRaw('COUNT(*) as count')
+            ->selectRaw('COALESCE(SUM(subtotal), 0) as subtotal')
+            ->selectRaw('COALESCE(SUM(discount_amount), 0) as discount')
+            ->selectRaw('COALESCE(SUM(total), 0) as total')
+            ->selectRaw('COALESCE(SUM(paid_amount), 0) as paid')
+            ->selectRaw('COALESCE(SUM(remaining), 0) as outstanding')
+            ->first();
+
+        $counterSales = SalesInvoice::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('invoice_date', $dateRange)
+            ->whereNull('repair_id')
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total), 0) as total')
+            ->first();
+
+        $repairSales = SalesInvoice::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('invoice_date', $dateRange)
+            ->whereNotNull('repair_id')
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total), 0) as total')
+            ->first();
+
+        $itemTotals = SalesInvoiceItem::query()
+            ->join('sales_invoices', 'sales_invoices.id', '=', 'sales_invoice_items.sales_invoice_id')
+            ->where('sales_invoices.status', DocumentStatus::POSTED)
+            ->whereBetween('sales_invoices.invoice_date', $dateRange)
+            ->selectRaw("COALESCE(SUM(CASE WHEN sales_invoice_items.line_type = 'MATERIAL' THEN sales_invoice_items.line_total ELSE 0 END), 0) as materials_revenue")
+            ->selectRaw("COALESCE(SUM(CASE WHEN sales_invoice_items.line_type = 'SERVICE' THEN sales_invoice_items.line_total ELSE 0 END), 0) as services_revenue")
+            ->first();
+
+        // 2. Cost of Goods Sold (COGS)
+        $cogsRaw = SalesInvoiceItem::query()
+            ->join('sales_invoices', 'sales_invoices.id', '=', 'sales_invoice_items.sales_invoice_id')
+            ->join('materials', 'materials.id', '=', 'sales_invoice_items.material_id')
+            ->where('sales_invoices.status', DocumentStatus::POSTED)
+            ->whereBetween('sales_invoices.invoice_date', $dateRange)
+            ->where('sales_invoice_items.line_type', 'MATERIAL')
+            ->selectRaw('COALESCE(SUM(sales_invoice_items.quantity * materials.cost_price), 0) as cogs')
+            ->value('cogs');
+
+        $netRevenueMoney = Money::fromDecimal($salesTotals?->total);
+        $cogsMoney = Money::fromDecimal($cogsRaw);
+        $grossProfitMoney = $netRevenueMoney->subtract($cogsMoney);
+        $grossMargin = $netRevenueMoney->toCents() > 0
+            ? round(($grossProfitMoney->toCents() / $netRevenueMoney->toCents()) * 100, 2)
+            : 0.0;
+
+        // 3. Operating expenses
+        $expenseTotals = Expense::query()
+            ->counted()
+            ->whereBetween('expense_date', $dateRange)
+            ->selectRaw('COUNT(*) as entries, COALESCE(SUM(amount), 0) as total')
+            ->first();
+        $expenseAmountMoney = Money::fromDecimal($expenseTotals?->total);
+
+        // 4. Technician commissions
+        $commissionRaw = TechnicianTransaction::query()
+            ->where('reference_type', Repair::class)
+            ->whereBetween('transaction_date', $dateRange)
+            ->selectRaw('COALESCE(SUM(credit - debit), 0) as total')
+            ->value('total');
+        $commissionMoney = Money::fromDecimal($commissionRaw);
+
+        // Total operating costs (expenses + commissions)
+        $operatingCostsMoney = $expenseAmountMoney->add($commissionMoney);
+
+        // 5. Net profit
+        $netProfitMoney = $grossProfitMoney->subtract($operatingCostsMoney);
+        $netMargin = $netRevenueMoney->toCents() > 0
+            ? round(($netProfitMoney->toCents() / $netRevenueMoney->toCents()) * 100, 2)
+            : 0.0;
+
+        // 6. Purchases (context on stock acquisition)
+        $purchasesTotal = PurchaseInvoice::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('purchase_date', $dateRange)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total), 0) as total')
+            ->first();
+
+        // 7. Cash flow totals for period
+        $collectedFromCustomers = Payment::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->where('payment_type', PaymentType::CUSTOMER)
+            ->whereBetween('payment_date', $dateRange)
+            ->sum('amount');
+
+        $paidToSuppliers = Payment::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->where('payment_type', PaymentType::SUPPLIER)
+            ->whereBetween('payment_date', $dateRange)
+            ->sum('amount');
+
+        $paidToTechnicians = Payment::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->where('payment_type', PaymentType::TECHNICIAN)
+            ->whereBetween('payment_date', $dateRange)
+            ->sum('amount');
+
+        $netCashFlowMoney = Money::fromDecimal($collectedFromCustomers)
+            ->subtract(Money::fromDecimal($paidToSuppliers))
+            ->subtract(Money::fromDecimal($paidToTechnicians))
+            ->subtract($expenseAmountMoney);
+
+        // 8. Daily breakdown
+        $dailySales = SalesInvoice::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('invoice_date', $dateRange)
+            ->groupBy('invoice_date')
+            ->selectRaw('invoice_date as date, COUNT(*) as invoices, COALESCE(SUM(total), 0) as revenue')
+            ->get()
+            ->keyBy(fn ($r) => substr((string) $r->date, 0, 10));
+
+        $dailyCogs = SalesInvoiceItem::query()
+            ->join('sales_invoices', 'sales_invoices.id', '=', 'sales_invoice_items.sales_invoice_id')
+            ->join('materials', 'materials.id', '=', 'sales_invoice_items.material_id')
+            ->where('sales_invoices.status', DocumentStatus::POSTED)
+            ->whereBetween('sales_invoices.invoice_date', $dateRange)
+            ->where('sales_invoice_items.line_type', 'MATERIAL')
+            ->groupBy('sales_invoices.invoice_date')
+            ->selectRaw('sales_invoices.invoice_date as date, COALESCE(SUM(sales_invoice_items.quantity * materials.cost_price), 0) as cogs')
+            ->get()
+            ->keyBy(fn ($r) => substr((string) $r->date, 0, 10));
+
+        $dailyExpenses = Expense::query()
+            ->counted()
+            ->whereBetween('expense_date', $dateRange)
+            ->groupBy('expense_date')
+            ->selectRaw('expense_date as date, COALESCE(SUM(amount), 0) as expenses')
+            ->get()
+            ->keyBy(fn ($r) => substr((string) $r->date, 0, 10));
+
+        $dailyCommissions = TechnicianTransaction::query()
+            ->where('reference_type', Repair::class)
+            ->whereBetween('transaction_date', $dateRange)
+            ->groupBy('transaction_date')
+            ->selectRaw('transaction_date as date, COALESCE(SUM(credit - debit), 0) as commissions')
+            ->get()
+            ->keyBy(fn ($r) => substr((string) $r->date, 0, 10));
+
+        $allDates = collect()
+            ->merge($dailySales->keys())
+            ->merge($dailyCogs->keys())
+            ->merge($dailyExpenses->keys())
+            ->merge($dailyCommissions->keys())
+            ->unique()
+            ->sort()
+            ->values();
+
+        $byDay = $allDates->map(function (string $day) use ($dailySales, $dailyCogs, $dailyExpenses, $dailyCommissions) {
+            $rev = Money::fromDecimal($dailySales[$day]?->revenue ?? 0);
+            $cg = Money::fromDecimal($dailyCogs[$day]?->cogs ?? 0);
+            $gp = $rev->subtract($cg);
+            $exp = Money::fromDecimal($dailyExpenses[$day]?->expenses ?? 0);
+            $comm = Money::fromDecimal($dailyCommissions[$day]?->commissions ?? 0);
+            $opCost = $exp->add($comm);
+            $np = $gp->subtract($opCost);
+            $margin = $rev->toCents() > 0 ? round(($np->toCents() / $rev->toCents()) * 100, 2) : 0.0;
+
+            return [
+                'date' => $day,
+                'count' => (int) ($dailySales[$day]?->invoices ?? 0),
+                'revenue' => $rev->toDecimal(),
+                'cogs' => $cg->toDecimal(),
+                'gross_profit' => $gp->toDecimal(),
+                'expenses' => $exp->toDecimal(),
+                'commissions' => $comm->toDecimal(),
+                'operating_costs' => $opCost->toDecimal(),
+                'net_profit' => $np->toDecimal(),
+                'margin_percent' => $margin,
+                'is_loss' => $np->isNegative(),
+            ];
+        })->all();
+
+        // 9. Top profitable materials
+        $topMaterials = SalesInvoiceItem::query()
+            ->join('sales_invoices', 'sales_invoices.id', '=', 'sales_invoice_items.sales_invoice_id')
+            ->join('materials', 'materials.id', '=', 'sales_invoice_items.material_id')
+            ->leftJoin('service_units', 'service_units.id', '=', 'materials.unit_id')
+            ->where('sales_invoices.status', DocumentStatus::POSTED)
+            ->whereBetween('sales_invoices.invoice_date', $dateRange)
+            ->where('sales_invoice_items.line_type', 'MATERIAL')
+            ->groupBy('materials.id', 'materials.name', 'materials.sku', 'materials.cost_price', 'service_units.name_ar')
+            ->selectRaw('materials.id, materials.name, materials.sku, service_units.name_ar as unit')
+            ->selectRaw('COALESCE(SUM(sales_invoice_items.quantity), 0) as quantity')
+            ->selectRaw('COALESCE(SUM(sales_invoice_items.line_total), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(sales_invoice_items.quantity * materials.cost_price), 0) as cost')
+            ->selectRaw('COALESCE(SUM(sales_invoice_items.line_total - (sales_invoice_items.quantity * materials.cost_price)), 0) as profit')
+            ->orderByDesc('profit')
+            ->limit(10)
+            ->get()
+            ->map(function ($row) {
+                $rev = Money::fromDecimal($row->revenue);
+                $prf = Money::fromDecimal($row->profit);
+                $margin = $rev->toCents() > 0 ? round(($prf->toCents() / $rev->toCents()) * 100, 2) : 0.0;
+
+                return [
+                    'id' => (int) $row->id,
+                    'name' => $row->name,
+                    'sku' => $row->sku,
+                    'unit' => $row->unit,
+                    'quantity' => $this->quantity($row->quantity),
+                    'revenue' => $rev->toDecimal(),
+                    'cost' => Money::fromDecimal($row->cost)->toDecimal(),
+                    'profit' => $prf->toDecimal(),
+                    'margin_percent' => $margin,
+                ];
+            })
+            ->all();
+
+        // 10. Expenses by category
+        $expenseCategories = Expense::query()
+            ->counted()
+            ->whereBetween('expense_date', $dateRange)
+            ->join('expense_categories', 'expense_categories.id', '=', 'expenses.expense_category_id')
+            ->groupBy('expense_categories.id', 'expense_categories.name')
+            ->selectRaw('expense_categories.id, expense_categories.name, COUNT(*) as entries, COALESCE(SUM(expenses.amount), 0) as total')
+            ->orderByDesc('total')
+            ->get()
+            ->map(function ($row) use ($expenseAmountMoney) {
+                $tot = Money::fromDecimal($row->total);
+                $share = $expenseAmountMoney->toCents() > 0
+                    ? round(($tot->toCents() / $expenseAmountMoney->toCents()) * 100, 1)
+                    : 0.0;
+
+                return [
+                    'id' => (int) $row->id,
+                    'name' => $row->name,
+                    'entries' => (int) $row->entries,
+                    'total' => $tot->toDecimal(),
+                    'share_percent' => $share,
+                ];
+            })
+            ->all();
+
+        // 11. Top services
+        $topServices = SalesInvoiceItem::query()
+            ->join('sales_invoices', 'sales_invoices.id', '=', 'sales_invoice_items.sales_invoice_id')
+            ->leftJoin('services', 'services.id', '=', 'sales_invoice_items.service_id')
+            ->where('sales_invoices.status', DocumentStatus::POSTED)
+            ->whereBetween('sales_invoices.invoice_date', $dateRange)
+            ->where('sales_invoice_items.line_type', 'SERVICE')
+            ->groupBy('services.id', 'sales_invoice_items.description', 'services.name')
+            ->selectRaw("COALESCE(services.name, sales_invoice_items.description, 'خدمة') as name")
+            ->selectRaw('COUNT(*) as count')
+            ->selectRaw('COALESCE(SUM(sales_invoice_items.line_total), 0) as revenue')
+            ->orderByDesc('revenue')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->name,
+                'count' => (int) $row->count,
+                'revenue' => Money::fromDecimal($row->revenue)->toDecimal(),
+            ])
+            ->all();
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'revenue' => [
+                'total' => $netRevenueMoney->toDecimal(),
+                'subtotal' => Money::fromDecimal($salesTotals?->subtotal)->toDecimal(),
+                'discount' => Money::fromDecimal($salesTotals?->discount)->toDecimal(),
+                'invoices_count' => (int) ($salesTotals?->count ?? 0),
+                'paid' => Money::fromDecimal($salesTotals?->paid)->toDecimal(),
+                'outstanding' => Money::fromDecimal($salesTotals?->outstanding)->toDecimal(),
+                'materials_revenue' => Money::fromDecimal($itemTotals?->materials_revenue)->toDecimal(),
+                'services_revenue' => Money::fromDecimal($itemTotals?->services_revenue)->toDecimal(),
+                'counter_sales' => [
+                    'count' => (int) ($counterSales?->count ?? 0),
+                    'total' => Money::fromDecimal($counterSales?->total)->toDecimal(),
+                ],
+                'repair_sales' => [
+                    'count' => (int) ($repairSales?->count ?? 0),
+                    'total' => Money::fromDecimal($repairSales?->total)->toDecimal(),
+                ],
+            ],
+            'cogs' => [
+                'total' => $cogsMoney->toDecimal(),
+            ],
+            'gross_profit' => [
+                'total' => $grossProfitMoney->toDecimal(),
+                'margin_percent' => $grossMargin,
+            ],
+            'operating_expenses' => [
+                'total' => $expenseAmountMoney->toDecimal(),
+                'entries_count' => (int) ($expenseTotals?->entries ?? 0),
+                'by_category' => $expenseCategories,
+            ],
+            'technician_commissions' => [
+                'total' => $commissionMoney->toDecimal(),
+            ],
+            'operating_costs' => [
+                'total' => $operatingCostsMoney->toDecimal(),
+            ],
+            'net_profit' => [
+                'total' => $netProfitMoney->toDecimal(),
+                'margin_percent' => $netMargin,
+                'is_loss' => $netProfitMoney->isNegative(),
+            ],
+            'purchases' => [
+                'count' => (int) ($purchasesTotal?->count ?? 0),
+                'total' => Money::fromDecimal($purchasesTotal?->total)->toDecimal(),
+            ],
+            'cash_flow' => [
+                'collected' => Money::fromDecimal($collectedFromCustomers)->toDecimal(),
+                'paid_suppliers' => Money::fromDecimal($paidToSuppliers)->toDecimal(),
+                'paid_technicians' => Money::fromDecimal($paidToTechnicians)->toDecimal(),
+                'paid_expenses' => $expenseAmountMoney->toDecimal(),
+                'net_cash_flow' => $netCashFlowMoney->toDecimal(),
+            ],
+            'top_materials' => $topMaterials,
+            'top_services' => $topServices,
+            'by_day' => $byDay,
+        ];
     }
 
     /**

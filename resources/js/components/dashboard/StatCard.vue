@@ -2,8 +2,8 @@
     <component
         :is="to ? RouterLink : 'div'"
         :to="to"
-        class="block rounded-2xl border border-slate-200 bg-white p-5 transition"
-        :class="to ? 'hover:border-blue-300 hover:shadow-sm' : ''"
+        class="group relative block rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition duration-200"
+        :class="to ? 'hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md' : ''"
     >
         <div class="flex items-center gap-3">
             <span

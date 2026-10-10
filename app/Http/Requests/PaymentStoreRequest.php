@@ -18,7 +18,12 @@ class PaymentStoreRequest extends FormRequest
             'customer_id' => ['required_if:payment_type,CUSTOMER', 'exists:customers,id'],
             'supplier_id' => ['required_if:payment_type,SUPPLIER', 'exists:suppliers,id'],
             'technician_id' => ['required_if:payment_type,TECHNICIAN', 'exists:technicians,id'],
-            'amount' => ['required', 'numeric', 'gt:0'],
+            // بعملة غير الدولار يُرسَل المبلغ كما سُلِّم (currency_amount)
+            // ويحسب الخادم ما يعادله بالدولار.
+            'amount' => ['required_without:currency_amount', 'nullable', 'numeric', 'gt:0'],
+            'currency_code' => ['sometimes', 'nullable', 'string', 'size:3', 'exists:currencies,code'],
+            'currency_amount' => ['nullable', 'numeric', 'gt:0', 'max:9999999999999'],
+            'exchange_rate' => ['nullable', 'numeric', 'gt:0'],
             'payment_method' => ['sometimes', 'in:CASH,BANK,OTHER'],
             'reference_no' => ['nullable', 'string', 'max:50'],
             'payment_date' => ['nullable', 'date'],
@@ -46,6 +51,8 @@ class PaymentStoreRequest extends FormRequest
         return [
             'technician_id.required_if' => 'اختيار خبير الصيانة مطلوب لسند الصرف.',
             'allocations.prohibited_if' => 'سندات خبراء الصيانة لا تُخصَّص على فواتير.',
+            'currency_code.exists' => 'العملة غير معرّفة في النظام.',
+            'currency_amount.gt' => 'المبلغ يجب أن يكون أكبر من صفر.',
         ];
     }
 }

@@ -41,7 +41,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="loading" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
+                        <tr v-if="loading && !items.length" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
                         <tr v-else-if="!items.length" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">لا توجد نتائج</td></tr>
                         <tr v-for="row in items" :key="row.id"
                             :class="posting?.id === row.id ? 'bg-emerald-50/70' : 'hover:bg-slate-50'">
@@ -52,7 +52,7 @@
                             <td class="px-4 py-3 text-left">{{ formatMoney(row.remaining) }}</td>
                             <td class="px-4 py-3"><StatusBadge :status="row.status" /></td>
                             <td class="px-4 py-3">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 whitespace-nowrap">
                                     <button class="text-slate-500 hover:text-slate-900" @click="openDetail(row)">عرض</button>
                                     <PrintButton kind="invoice" title="طباعة الفاتورة" :load="(paper) => documentsApi.purchaseInvoice(row.id, paper)" />
                                     <RouterLink v-if="row.status === 'DRAFT'" :to="{ name: 'purchases.edit', params: { id: row.id } }"
@@ -69,13 +69,16 @@
                     </tbody>
                 </table>
             </div>
-            <div v-if="meta" class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-                <span>صفحة {{ meta.current_page }} من {{ meta.last_page }} — {{ meta.total }}</span>
-                <div class="flex gap-2">
-                    <button :disabled="!meta.prev_page_url" class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page--">السابق</button>
-                    <button :disabled="!meta.next_page_url" class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page++">التالي</button>
-                </div>
-            </div>
+            <InfiniteScrollFooter
+                :shown="items.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :busy="loading"
+                :error="moreError"
+                unit="فاتورة"
+                @more="loadMore"
+            />
         </div>
 
         <BaseModal :open="detail?.id" :title="`فاتورة الشراء ${detail?.invoice_no || ''}`" @close="detail = null">
@@ -92,7 +95,8 @@
                 <div v-if="detail.cancellation_reason" class="mt-3 rounded bg-orange-50 px-3 py-2 text-sm text-orange-700">
                     سبب الإلغاء: {{ detail.cancellation_reason }}
                 </div>
-                <table class="mt-4 w-full text-right text-sm">
+                <div class="mt-4 overflow-x-auto">
+                <table class="w-full min-w-[420px] text-right text-sm">
                     <thead class="bg-slate-50 text-xs font-semibold text-slate-500">
                         <tr><th class="px-3 py-2">المادة</th><th class="px-3 py-2">الكمية</th><th class="px-3 py-2">السعر</th><th class="px-3 py-2 text-left">الإجمالي</th></tr>
                     </thead>
@@ -105,6 +109,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </BaseModal>
 
@@ -113,12 +118,13 @@
             :invoice="posting"
             @close="posting = null"
             @posted="onPosted"
-            @stale="posting = null; fetchData()"
+            @stale="posting = null; fetchData({ keep: true })"
         />
     </div>
 </template>
 
 <script setup>
+import { BASE_SYMBOL } from '../../constants/currency';
 import { onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { documentsApi, purchasesApi } from '../../services/api';
@@ -131,18 +137,27 @@ import BaseModal from '../../components/ui/BaseModal.vue';
 import StatusBadge from '../../components/ui/StatusBadge.vue';
 import PrintButton from '../../components/ui/PrintButton.vue';
 import PurchasePostModal from '../../components/purchases/PurchasePostModal.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
 
 
 const { can } = usePermissions();
 const auth = useAuthStore();
-const items = ref([]);
-const meta = ref(null);
-const loading = ref(false);
+const { items, meta, loading, loadingMore, moreError, hasMore, reload: fetchData, loadMore } = useInfiniteList({
+    fetch: (page, perPage) => purchasesApi.index({
+        search: search.value || undefined,
+        status: statusFilter.value || undefined,
+        from: from.value || undefined,
+        to: to.value || undefined,
+        page,
+        per_page: perPage,
+    }),
+    onError: (e) => toast.error(apiMessage(e, 'تعذّر تحميل القائمة')),
+});
 const search = ref('');
 const statusFilter = ref('');
 const from = ref('');
 const to = ref('');
-const page = ref(1);
 const detail = ref(null);
 const posting = ref(null);
 const toast = useToast();
@@ -150,27 +165,9 @@ let t = null;
 
 watch([search, statusFilter, from, to], () => {
     clearTimeout(t);
-    t = setTimeout(() => { page.value = 1; fetchData(); }, 350);
+    t = setTimeout(() => fetchData(), 350);
 });
-watch(page, fetchData);
 
-async function fetchData() {
-    loading.value = true;
-    try {
-        const data = await purchasesApi.index({
-            search: search.value || undefined,
-            status: statusFilter.value || undefined,
-            from: from.value || undefined,
-            to: to.value || undefined,
-            page: page.value,
-            per_page: 15,
-        });
-        items.value = data.data ?? data;
-        meta.value = data.meta ?? null;
-    } finally {
-        loading.value = false;
-    }
-}
 
 async function openDetail(row) {
     try {
@@ -195,7 +192,7 @@ function onPosted(invoice) {
             ? `تم ترحيل الفاتورة ${invoice.invoice_no} ودخلت البضاعة المستودع`
             : 'تم ترحيل الفاتورة'
     );
-    fetchData();
+    fetchData({ keep: true });
 }
 
 async function cancel(row) {
@@ -205,7 +202,7 @@ async function cancel(row) {
     try {
         await purchasesApi.cancel(row.id, { reason: reason.trim() });
         toast.success('تم إلغاء الفاتورة وعُكست حركاتها');
-        fetchData();
+        fetchData({ keep: true });
     } catch (e) {
         toast.error(apiMessage(e, 'تعذّر الإلغاء'));
     }
@@ -215,7 +212,7 @@ async function remove(row) {
     const ok = await confirm({
         title: 'حذف مسودة الفاتورة؟',
         message: `تُحذف مسودة ${row.supplier?.name || 'الفاتورة'} نهائياً ولا يمكن استرجاعها.`,
-        detail: `${formatMoney(row.total)} ل.س · ${row.purchase_date}`,
+        detail: `${formatMoney(row.total)} · ${row.purchase_date}`,
         confirmLabel: 'حذف نهائي',
         tone: 'danger',
     });
@@ -223,7 +220,7 @@ async function remove(row) {
     try {
         await purchasesApi.destroy(row.id);
         toast.success('تم حذف المسودة');
-        fetchData();
+        fetchData({ keep: true });
     } catch (e) {
         toast.error(apiMessage(e, 'تعذّر الحذف'));
     }
@@ -233,7 +230,7 @@ function formatMoney(value) {
     return new Intl.NumberFormat(auth.locale === 'en' ? 'en' : 'ar-SY', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-    }).format(Number(value) || 0);
+    }).format(Number(value) || 0) + ` ${BASE_SYMBOL}`;
 }
 
 onMounted(fetchData);

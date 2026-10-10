@@ -50,6 +50,18 @@ class ReportsController extends Controller
     }
 
     /**
+     * Profit & Loss and profitability summary for a period.
+     */
+    public function profitSummary(ReportRequest $request): JsonResponse
+    {
+        $period = $request->validate($request->periodRules(), $request->messages());
+
+        return response()->json([
+            'data' => $this->reports->profitSummary($period['from'], $period['to']),
+        ]);
+    }
+
+    /**
      * Outstanding customer balances (what the company is owed).
      */
     public function receivables(ReportRequest $request): JsonResponse

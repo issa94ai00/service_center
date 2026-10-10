@@ -21,7 +21,8 @@ class Expense extends Model
     public const CANCELLED = 'CANCELLED';
 
     protected $fillable = [
-        'expense_no', 'expense_category_id', 'amount', 'payment_method', 'expense_date',
+        'expense_no', 'expense_category_id', 'amount',
+        'currency_code', 'exchange_rate', 'currency_amount', 'payment_method', 'expense_date',
         'payee', 'notes', 'status', 'recorded_by', 'cancelled_by', 'cancelled_at',
         'cancellation_reason',
     ];
@@ -31,6 +32,8 @@ class Expense extends Model
         return [
             'payment_method' => PaymentMethod::class,
             'amount' => 'decimal:2',
+            'exchange_rate' => 'decimal:6',
+            'currency_amount' => 'decimal:2',
             'expense_date' => 'date',
             'cancelled_at' => 'datetime',
         ];

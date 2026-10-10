@@ -7,6 +7,7 @@ use App\Enums\PaymentType;
 use App\Enums\TransactionType;
 use App\Exceptions\BusinessRuleException;
 use App\Exceptions\DocumentLockedException;
+use App\Models\Currency;
 use App\Models\CustomerTransaction;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
@@ -19,14 +20,20 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentService
 {
-    public function __construct(private readonly NumberingService $numbers) {}
+    public function __construct(
+        private readonly NumberingService $numbers,
+        private readonly CurrencyService $currencies,
+    ) {}
 
     /**
      * Persist a draft payment with its allocations (draft only).
      */
     public function saveDraft(Payment $payment, array $data, int $userId): Payment
     {
-        $payment->fill($this->draftPayload($data, $userId));
+        // A receipt in SYP (or any managed currency) is converted here, so
+        // `amount` — what allocations and the ledger read — is always USD.
+        $currency = $this->currencies->resolve($data, $payment->exists ? $payment : null);
+        $payment->fill([...$this->draftPayload($data, $userId), ...$currency]);
 
         // Only when the caller said something about it: a plain edit from the
         // payments screen must not unlink a receipt from its repair.
@@ -301,7 +308,7 @@ class PaymentService
             'customer_id' => ($data['payment_type'] ?? null) === PaymentType::CUSTOMER->value ? $data['customer_id'] : null,
             'supplier_id' => ($data['payment_type'] ?? null) === PaymentType::SUPPLIER->value ? $data['supplier_id'] : null,
             'technician_id' => ($data['payment_type'] ?? null) === PaymentType::TECHNICIAN->value ? $data['technician_id'] : null,
-            'amount' => $data['amount'],
+            'amount' => $data['amount'] ?? null,
             'payment_method' => $data['payment_method'] ?? 'CASH',
             'reference_no' => $data['reference_no'] ?? null,
             'payment_date' => $data['payment_date'] ?? now()->toDateString(),
@@ -353,6 +360,7 @@ class PaymentService
         $description = $reversal
             ? __('Cancelled payment :no', ['no' => $payment->reference_no])
             : __('Payment :no', ['no' => $payment->reference_no]);
+        $description .= $this->foreignNote($payment);
 
         if ($payment->payment_type === PaymentType::TECHNICIAN) {
             // الصرف للخبير مدين: يُنقص ما يستحقّه، وعكسه عند الإلغاء دائن.
@@ -396,6 +404,29 @@ class PaymentService
                 'created_by' => $userId,
             ]);
         }
+    }
+
+    /**
+     * " — 1,300,000 ل.س × 13,000" on the statement line of a payment handled in
+     * another currency, so the account holder recognises the cash they handed over.
+     */
+    protected function foreignNote(Payment $payment): string
+    {
+        $code = $payment->currency_code;
+        if (! $code || $code === Currency::BASE || $payment->currency_amount === null) {
+            return '';
+        }
+
+        $currency = Currency::query()->where('code', $code)->first();
+        $decimals = $currency?->decimals ?? 2;
+        $rate = rtrim(rtrim(number_format((float) $payment->exchange_rate, 6, '.', ','), '0'), '.');
+
+        return sprintf(
+            ' — %s %s × %s',
+            number_format((float) $payment->currency_amount, $decimals, '.', ','),
+            $currency?->symbol ?? $code,
+            $rate,
+        );
     }
 
     protected function assertStatus(Payment $payment, DocumentStatus $expected): void

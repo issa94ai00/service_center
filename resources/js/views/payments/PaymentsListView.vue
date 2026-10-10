@@ -53,7 +53,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="loading" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
+                        <tr v-if="loading && !items.length" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
                         <tr v-else-if="!items.length" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">لا توجد نتائج</td></tr>
                         <tr v-for="row in items" :key="row.id" class="transition"
                             :class="posting?.id === row.id ? 'bg-emerald-50/70' : 'hover:bg-slate-50'">
@@ -70,10 +70,10 @@
                             </td>
                             <td class="px-4 py-3 text-slate-600">{{ methodLabel(row.payment_method) }}</td>
                             <td class="px-4 py-3 text-slate-600" dir="ltr">{{ row.payment_date }}</td>
-                            <td class="px-3 py-3 text-left font-semibold">{{ formatMoney(row.amount) }}</td>
+                            <td class="px-3 py-3 text-left font-semibold">{{ formatMoney(row.amount) }}<ForeignAmount :row="row" /></td>
                             <td class="px-4 py-3"><StatusBadge :status="row.status" /></td>
                             <td class="px-4 py-3">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 whitespace-nowrap">
                                     <button class="text-slate-500 hover:text-slate-900" @click="openDetail(row)">عرض</button>
                                     <PrintButton kind="payment" title="طباعة السند" :load="(paper) => documentsApi.paymentReceipt(row.id, paper)" />
                                     <RouterLink v-if="row.repair" :to="{ name: 'repairs', query: { search: row.repair.receipt_no } }"
@@ -93,13 +93,16 @@
                     </tbody>
                 </table>
             </div>
-            <div v-if="meta" class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-                <span>صفحة {{ meta.current_page }} من {{ meta.last_page }} — {{ meta.total }}</span>
-                <div class="flex gap-2">
-                    <button :disabled="!meta.prev_page_url" class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page--">السابق</button>
-                    <button :disabled="!meta.next_page_url" class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page++">التالي</button>
-                </div>
-            </div>
+            <InfiniteScrollFooter
+                :shown="items.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :busy="loading"
+                :error="moreError"
+                unit="سند"
+                @more="loadMore"
+            />
         </div>
 
         <BaseModal :open="detail?.id" :title="`الدفعة ${detail?.reference_no || ''}`" @close="detail = null">
@@ -108,7 +111,7 @@
                     <div><dt class="text-slate-500">{{ isIncoming ? 'العميل' : 'المورد' }}</dt><dd class="font-medium">{{ partyName(detail) }}</dd></div>
                     <div><dt class="text-slate-500">التاريخ</dt><dd dir="ltr">{{ detail.payment_date }}</dd></div>
                     <div><dt class="text-slate-500">الطريقة</dt><dd>{{ methodLabel(detail.payment_method) }}</dd></div>
-                    <div><dt class="text-slate-500">المبلغ</dt><dd class="font-bold">{{ formatMoney(detail.amount) }}</dd></div>
+                    <div><dt class="text-slate-500">المبلغ</dt><dd class="font-bold">{{ formatMoney(detail.amount) }} {{ CURRENCY }}<ForeignAmount :row="detail" /></dd></div>
                     <div v-if="detail.repair"><dt class="text-slate-500">بلاغ الصيانة</dt><dd class="font-medium" dir="ltr">{{ detail.repair.receipt_no }}</dd></div>
                     <div v-if="detail.repair?.device"><dt class="text-slate-500">الجهاز</dt><dd>{{ detail.repair.device }}</dd></div>
                 </dl>
@@ -117,7 +120,8 @@
                 </div>
                 <div v-if="detail.notes" class="mt-3 text-sm text-slate-600">ملاحظات: {{ detail.notes }}</div>
                 <h3 class="mt-4 mb-2 text-sm font-bold text-slate-900">التخصيص على الفواتير</h3>
-                <table class="w-full text-right text-sm">
+                <div class="overflow-x-auto">
+                <table class="w-full min-w-[420px] text-right text-sm">
                     <thead class="bg-slate-50 text-xs font-semibold text-slate-500">
                         <tr><th class="px-3 py-2">الفاتورة</th><th class="px-3 py-2">التاريخ</th><th class="px-3 py-2 text-left">المبلغ المخصص</th><th class="px-3 py-2 text-left">المتبقي</th></tr>
                     </thead>
@@ -130,6 +134,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </BaseModal>
 
@@ -138,7 +143,7 @@
             :payment="posting"
             @close="posting = null"
             @posted="onPosted"
-            @stale="posting = null; fetchData()"
+            @stale="posting = null; fetchData({ keep: true })"
         />
     </div>
 </template>
@@ -155,22 +160,35 @@ import { paymentMethodLabel } from '../../constants/paymentMethods';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import PaymentPostModal from '../../components/payments/PaymentPostModal.vue';
 import StatusBadge from '../../components/ui/StatusBadge.vue';
+import ForeignAmount from '../../components/ui/ForeignAmount.vue';
+import { BASE_SYMBOL } from '../../constants/currency';
 import PrintButton from '../../components/ui/PrintButton.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
 
 
 const { can } = usePermissions();
 const toast = useToast();
 const route = useRoute();
-const CURRENCY = 'ل.س';
-const items = ref([]);
-const meta = ref(null);
-const loading = ref(false);
+const CURRENCY = BASE_SYMBOL;
+const { items, meta, loading, loadingMore, moreError, hasMore, reload: fetchData, loadMore } = useInfiniteList({
+    fetch: (page, perPage) => paymentsApi.index({
+        payment_type: paymentType.value,
+        search: search.value || undefined,
+        status: statusFilter.value || undefined,
+        source: isIncoming.value ? (sourceFilter.value || undefined) : undefined,
+        from: from.value || undefined,
+        to: to.value || undefined,
+        page,
+        per_page: perPage,
+    }),
+    onError: (e) => toast.error(apiMessage(e, 'تعذّر تحميل القائمة')),
+});
 const search = ref('');
 const statusFilter = ref('');
 const sourceFilter = ref('');
 const from = ref('');
 const to = ref('');
-const page = ref(1);
 const detail = ref(null);
 const posting = ref(null);
 let t = null;
@@ -203,29 +221,9 @@ function methodLabel(m) {
 
 watch([paymentType, search, statusFilter, sourceFilter, from, to], () => {
     clearTimeout(t);
-    t = setTimeout(() => { page.value = 1; fetchData(); }, 350);
+    t = setTimeout(() => fetchData(), 350);
 });
-watch(page, fetchData);
 
-async function fetchData() {
-    loading.value = true;
-    try {
-        const data = await paymentsApi.index({
-            payment_type: paymentType.value,
-            search: search.value || undefined,
-            status: statusFilter.value || undefined,
-            source: isIncoming.value ? (sourceFilter.value || undefined) : undefined,
-            from: from.value || undefined,
-            to: to.value || undefined,
-            page: page.value,
-            per_page: 15,
-        });
-        items.value = data.data ?? data;
-        meta.value = data.meta ?? null;
-    } finally {
-        loading.value = false;
-    }
-}
 
 async function openDetail(row) {
     try {
@@ -250,7 +248,7 @@ function onPosted(payment) {
             ? `تم اعتماد الدفعة ${payment.reference_no}`
             : 'تم اعتماد الدفعة'
     );
-    fetchData();
+    fetchData({ keep: true });
 }
 
 async function cancel(row) {
@@ -260,7 +258,7 @@ async function cancel(row) {
     try {
         await paymentsApi.cancel(row.id, { reason: reason.trim() });
         toast.success('تم إلغاء الدفعة');
-        fetchData();
+        fetchData({ keep: true });
     } catch (e) {
         toast.error(apiMessage(e, 'تعذّر الإلغاء'));
     }
@@ -278,7 +276,7 @@ async function remove(row) {
     try {
         await paymentsApi.destroy(row.id);
         toast.success('تم حذف المسودة');
-        fetchData();
+        fetchData({ keep: true });
     } catch (e) {
         toast.error(apiMessage(e, 'تعذّر الحذف'));
     }

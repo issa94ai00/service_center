@@ -11,21 +11,26 @@ class MaterialCategoryPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->allows($user, 'materials.view');
+        return $user->hasRole('admin')
+            || $this->allows($user, 'materials.view')
+            || $this->allows($user, 'sales.create')
+            || $this->allows($user, 'sales.view')
+            || $this->allows($user, 'purchases.create')
+            || $this->allows($user, 'purchases.view');
     }
 
     public function create(User $user): bool
     {
-        return $this->allows($user, 'materials.create');
+        return $user->hasRole('admin') || $this->allows($user, 'materials.create');
     }
 
     public function update(User $user, MaterialCategory $category): bool
     {
-        return $this->allows($user, 'materials.edit');
+        return $user->hasRole('admin') || $this->allows($user, 'materials.edit');
     }
 
     public function delete(User $user, MaterialCategory $category): bool
     {
-        return $this->allows($user, 'materials.delete');
+        return $user->hasRole('admin') || $this->allows($user, 'materials.delete');
     }
 }

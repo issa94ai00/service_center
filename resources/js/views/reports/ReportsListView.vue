@@ -1,147 +1,201 @@
 <template>
     <div id="report-sheet" class="space-y-5">
-        <div class="flex flex-wrap items-start justify-between gap-3 print:hidden">
+        <!-- ------------------------------------------------ Top View Header -->
+        <div class="flex flex-wrap items-start justify-between gap-4 print:hidden">
             <div>
-                <h1 class="text-xl font-bold text-slate-900">التقارير</h1>
-                <p class="text-sm text-slate-500">{{ activeTab.hint }}</p>
+                <div class="flex items-center gap-2">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-xl text-blue-600 shadow-2xs">
+                        {{ activeTab.icon }}
+                    </span>
+                    <div>
+                        <h1 class="text-xl font-extrabold text-slate-900">{{ activeTab.label }}</h1>
+                        <p class="text-xs text-slate-500">{{ activeTab.hint }}</p>
+                    </div>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-2">
+
+            <!-- Export and Print Actions -->
+            <div class="flex flex-wrap items-center gap-2">
                 <button
                     type="button"
                     :disabled="exporting || !hasRows"
-                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                     @click="exportCsv"
                 >
-                    {{ exporting ? 'جارٍ التصدير...' : '⤓ تصدير CSV' }}
+                    <span v-if="exporting" class="inline-block animate-spin text-xs">⏳</span>
+                    <span v-else aria-hidden="true">📥</span>
+                    {{ exporting ? 'جارٍ التصدير...' : 'تصدير CSV' }}
                 </button>
+
                 <button
                     type="button"
                     :disabled="!hasRows"
-                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                     @click="printSheet"
                 >
-                    🖨 طباعة
+                    <span aria-hidden="true">🖨️</span>
+                    طباعة
                 </button>
             </div>
         </div>
 
-        <!-- Tabs scroll sideways on a phone instead of wrapping into a wall of pills. -->
-        <div class="-mx-1 overflow-x-auto px-1 pb-1 print:hidden">
-            <div ref="tablist" role="tablist" aria-label="التقارير" class="flex min-w-max gap-2">
+        <!-- ------------------------------------------------ Categorized Tabs Bar -->
+        <div class="space-y-2.5 print:hidden">
+            <!-- Group Category Filter Pills -->
+            <div class="flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-2.5">
                 <button
-                    v-for="tab in tabs"
-                    :key="tab.key"
-                    :id="`report-tab-${tab.key}`"
+                    v-for="cat in categories"
+                    :key="cat.key"
                     type="button"
-                    role="tab"
-                    :aria-selected="current === tab.key"
-                    :aria-controls="`report-panel-${tab.key}`"
-                    :tabindex="current === tab.key ? 0 : -1"
-                    class="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition"
-                    :class="current === tab.key
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
-                    @click="selectTab(tab.key)"
-                    @keydown="onTabKeydown"
+                    class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
+                    :class="selectedCategory === cat.key
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                    @click="setCategory(cat.key)"
                 >
-                    <span aria-hidden="true">{{ tab.icon }}</span>
-                    {{ tab.label }}
+                    <span>{{ cat.label }}</span>
+                    <span
+                        class="rounded-full px-1.5 py-0.2 text-[10px]"
+                        :class="selectedCategory === cat.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'"
+                    >
+                        {{ tabCountFor(cat.key) }}
+                    </span>
                 </button>
+            </div>
+
+            <!-- Tab Buttons Scroll Container -->
+            <div class="-mx-1 overflow-x-auto px-1 pb-1">
+                <div ref="tablist" role="tablist" aria-label="التقارير" class="flex min-w-max gap-2">
+                    <button
+                        v-for="tab in visibleTabs"
+                        :key="tab.key"
+                        :id="`report-tab-${tab.key}`"
+                        type="button"
+                        role="tab"
+                        :aria-selected="current === tab.key"
+                        :aria-controls="`report-panel-${tab.key}`"
+                        :tabindex="current === tab.key ? 0 : -1"
+                        class="flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition"
+                        :class="current === tab.key
+                            ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-600/30 font-semibold'
+                            : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'"
+                        @click="selectTab(tab.key)"
+                        @keydown="onTabKeydown"
+                    >
+                        <span aria-hidden="true" class="text-base">{{ tab.icon }}</span>
+                        <span>{{ tab.label }}</span>
+                        <span
+                            v-if="tab.badge"
+                            class="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                            :class="current === tab.key ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-800'"
+                        >
+                            {{ tab.badge }}
+                        </span>
+                    </button>
+                </div>
             </div>
         </div>
 
+        <!-- ------------------------------------------------ Main Report Panel -->
         <div
             :id="`report-panel-${current}`"
             role="tabpanel"
             :aria-labelledby="`report-tab-${current}`"
             class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:border-0 print:shadow-none"
         >
-            <!-- Print header: a printed sheet has to say what it is on its own. -->
-            <div class="hidden border-b border-slate-200 px-4 py-3 print:block">
-                <h2 class="text-lg font-bold">{{ activeTab.label }}</h2>
-                <p v-if="filterSummary" class="mt-0.5 text-xs text-slate-600">{{ filterSummary }}</p>
-                <p class="mt-0.5 text-[11px] text-slate-500">
-                    طُبع في {{ printedAt }}
-                    <template v-if="meta && meta.last_page > 1">
-                        — الصفحة {{ meta.current_page }} من {{ meta.last_page }} فقط
-                    </template>
-                </p>
+            <!-- Print Header: Clean store branding on printouts -->
+            <div class="hidden border-b-2 border-slate-900 px-6 py-4 print:block">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-xl font-bold">دماتك للاتصالات وأنظمة الصيانة</h1>
+                        <h2 class="text-base font-semibold text-slate-800 mt-1">{{ activeTab.label }}</h2>
+                    </div>
+                    <div class="text-left text-xs text-slate-500">
+                        <div>طُبع في {{ printedAt }}</div>
+                        <div v-if="filterSummary" class="mt-0.5">{{ filterSummary }}</div>
+                    </div>
+                </div>
             </div>
 
-            <!-- ------------------------------------------------ filter bar -->
-            <div class="border-b border-slate-100 bg-slate-50/60 px-4 py-3 print:hidden">
-                <div v-if="showDates" class="mb-3 flex flex-wrap items-center gap-2">
-                    <span class="text-xs font-medium text-slate-400">فترات سريعة</span>
+            <!-- ------------------------------------------------ Filter Bar -->
+            <div class="border-b border-slate-100 bg-slate-50/70 p-4 print:hidden">
+                <!-- Date Presets Row -->
+                <div v-if="showDates" class="mb-3.5 flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-500">فترات سريعة:</span>
                     <button
                         v-for="preset in presets"
                         :key="preset.key"
                         type="button"
                         class="rounded-full px-3 py-1 text-xs font-medium transition"
                         :class="activePreset === preset.key
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-100'"
+                            ? 'bg-blue-600 text-white font-semibold shadow-2xs'
+                            : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-100'"
                         @click="applyPreset(preset)"
                     >
                         {{ preset.label }}
                     </button>
                 </div>
 
-                <div class="flex flex-wrap items-end gap-3">
+                <div class="flex flex-wrap items-end gap-3.5">
+                    <!-- Date Pickers -->
                     <template v-if="showDates">
-                        <label class="text-xs font-medium text-slate-500">
+                        <label class="text-xs font-semibold text-slate-600">
                             من تاريخ
                             <input
                                 v-model="filters.from"
                                 type="date"
-                                class="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                class="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 @keyup.enter="applyFilters"
                             />
                         </label>
-                        <label class="text-xs font-medium text-slate-500">
+                        <label class="text-xs font-semibold text-slate-600">
                             إلى تاريخ
                             <input
                                 v-model="filters.to"
                                 type="date"
                                 :min="filters.from || undefined"
-                                class="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                class="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 @keyup.enter="applyFilters"
                             />
                         </label>
                     </template>
 
-                    <label v-if="showSearch" class="text-xs font-medium text-slate-500">
+                    <!-- Search Box -->
+                    <label v-if="showSearch" class="text-xs font-semibold text-slate-600">
                         بحث
                         <input
                             v-model="filters.search"
                             type="search"
-                            :placeholder="current === 'low-stock' ? 'اسم المادة أو الرمز' : 'الاسم أو الشركة أو الهاتف'"
-                            class="mt-1 block w-56 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            :placeholder="current === 'low-stock' ? 'اسم المادة أو الرمز...' : 'الاسم أو الشركة أو الهاتف...'"
+                            class="mt-1 block w-full rounded-xl sm:w-60 border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             @keyup.enter="applyFilters"
                         />
                     </label>
 
+                    <!-- Party Ledger Filters -->
                     <template v-if="partyTabs.includes(current)">
-                        <label class="text-xs font-medium text-slate-500">
+                        <label class="text-xs font-semibold text-slate-600">
                             الرصيد بتاريخ
                             <input
                                 v-model="filters.asOf"
                                 type="date"
-                                class="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                class="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 @keyup.enter="applyFilters"
                             />
                         </label>
-                        <label class="flex items-center gap-2 pb-2.5 text-sm text-slate-700">
-                            <input v-model="filters.onlyOutstanding" type="checkbox" class="rounded border-slate-300" />
+                        <label class="flex items-center gap-2 pb-2.5 text-sm font-medium text-slate-700">
+                            <input v-model="filters.onlyOutstanding" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                             غير المسددة فقط
                         </label>
                     </template>
 
+                    <!-- Stock Movement Filters -->
                     <template v-if="current === 'stock-movements'">
-                        <label class="text-xs font-medium text-slate-500">
+                        <label class="text-xs font-semibold text-slate-600">
                             المادة
                             <select
                                 v-model="filters.materialId"
-                                class="mt-1 block w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                class="mt-1 block w-full rounded-xl sm:w-52 border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             >
                                 <option :value="null">كل المواد</option>
                                 <option v-for="material in materials" :key="material.id" :value="material.id">
@@ -149,11 +203,11 @@
                                 </option>
                             </select>
                         </label>
-                        <label class="text-xs font-medium text-slate-500">
+                        <label class="text-xs font-semibold text-slate-600">
                             نوع الحركة
                             <select
                                 v-model="filters.movementType"
-                                class="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                class="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             >
                                 <option :value="null">الكل</option>
                                 <option v-for="type in movementTypes" :key="type.value" :value="type.value">
@@ -163,41 +217,51 @@
                         </label>
                     </template>
 
-                    <div class="flex items-center gap-2 pb-0.5">
+                    <!-- Filter Action Buttons -->
+                    <div class="flex flex-wrap items-center gap-2 pb-0.5">
                         <button
                             type="button"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                            :class="dirty ? 'ring-2 ring-blue-200' : ''"
+                            class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-2xs transition hover:bg-blue-700 focus:ring-2 focus:ring-blue-500/40"
+                            :class="dirty ? 'ring-2 ring-blue-400' : ''"
                             @click="applyFilters"
                         >
+                            <span>🔍</span>
                             عرض
                         </button>
+
                         <button
                             v-if="canReset"
                             type="button"
-                            class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                            class="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-2xs transition hover:bg-slate-50"
                             @click="resetFilters"
                         >
+                            <span>↺</span>
                             إعادة تعيين
                         </button>
-                        <!-- Filters only take effect on "عرض"; say so rather than let the table lie. -->
-                        <span v-if="dirty" class="text-xs text-blue-700">تغييرات غير مطبّقة</span>
+
+                        <!-- Unapplied changes warning -->
+                        <span v-if="dirty" class="flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                            <span class="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                            تغييرات غير مطبّقة
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <div v-if="error" class="m-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <!-- Error Banner -->
+            <div v-if="error" class="m-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <span>{{ error }}</span>
                 <button
                     type="button"
-                    class="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100 print:hidden"
+                    class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-2xs transition hover:bg-red-50 print:hidden"
                     @click="load"
                 >
                     إعادة المحاولة
                 </button>
             </div>
 
-            <div :aria-busy="loading">
+            <!-- Main Content Area -->
+            <div :aria-busy="loading" class="pt-4">
                 <TableSkeleton v-if="loading" :columns="skeletonColumns" />
 
                 <template v-else-if="!error">
@@ -211,36 +275,64 @@
                     />
 
                     <template v-else>
-                        <LowStockReport v-if="current === 'low-stock'" :rows="lowStock" />
+                        <!-- Profit & Loss Report -->
+                        <ProfitReport
+                            v-if="current === 'profit'"
+                            :summary="profitSummaryData"
+                            :show-repairs="showRepairs"
+                            :show-technicians="showTechnicians"
+                            :show-services="showServices"
+                        />
+
+                        <!-- Low Stock Alerts -->
+                        <LowStockReport
+                            v-else-if="current === 'low-stock'"
+                            :rows="lowStock"
+                        />
+
+                        <!-- Sales or Purchases Periodic Summary -->
                         <PeriodSummaryReport
                             v-else-if="periodTabs.includes(current)"
                             :summary="summary"
                             :kind="current"
                         />
+
+                        <!-- Customer / Supplier Balances -->
                         <PartyBalancesReport
                             v-else-if="partyTabs.includes(current)"
-                            :data="parties"
+                            :data="pagedReport"
                             :kind="current"
                             :as-of="filters.asOf"
                         />
+
+                        <!-- Technician Accounts & Repairs Breakdown -->
                         <TechnicianAccountsReport
                             v-else-if="technicianTabs.includes(current)"
-                            :data="technicianReport"
+                            :data="pagedReport"
                             :kind="current"
                             :from="filters.from"
                             :to="filters.to"
                         />
-                        <StockMovementsReport v-else :data="movements" />
+
+                        <!-- Stock Movement Log -->
+                        <StockMovementsReport
+                            v-else
+                            :data="pagedReport"
+                        />
                     </template>
                 </template>
             </div>
 
-            <Pager
-                v-if="meta && meta.total && !loading"
-                :meta="meta"
+            <!-- Pagination Footer for Paginated Reports -->
+            <InfiniteScrollFooter
+                v-if="isPaged && !loading && !error"
+                :shown="pagedRows.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :error="moreError"
                 :unit="activeTab.unit"
-                @go="goTo"
-                @per-page="changePerPage"
+                @more="loadMore"
             />
         </div>
     </div>
@@ -250,28 +342,48 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import EmptyState from '../../components/ui/EmptyState.vue';
-import Pager from '../../components/ui/Pager.vue';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
 import TableSkeleton from '../../components/ui/TableSkeleton.vue';
 import LowStockReport from '../../components/reports/LowStockReport.vue';
+import ProfitReport from '../../components/reports/ProfitReport.vue';
 import PartyBalancesReport from '../../components/reports/PartyBalancesReport.vue';
 import TechnicianAccountsReport from '../../components/reports/TechnicianAccountsReport.vue';
 import PeriodSummaryReport from '../../components/reports/PeriodSummaryReport.vue';
 import StockMovementsReport from '../../components/reports/StockMovementsReport.vue';
 import { materialsApi, reportsApi } from '../../services/api';
+import { useInfiniteList } from '../../composables/useInfiniteList';
 import { useToast } from '../../composables/useToast';
 import { csvNumber, downloadCsv } from '../../utils/csv';
 import { isoDate } from '../../utils/format';
+import { BASE_SYMBOL } from '../../constants/currency';
+import { usePermissions } from '../../composables/usePermissions';
+import { useFeaturesStore } from '../../stores/features';
 
-const tabs = [
+const { can } = usePermissions();
+const features = useFeaturesStore();
+
+const categoryOptions = [
+    { key: 'all', label: 'كل التقارير' },
+    { key: 'finance', label: '💰 المالية والأرباح' },
+    { key: 'inventory', label: '📦 المخزون' },
+    { key: 'repairs', label: '🔧 الصيانة' },
+];
+
+const selectedCategory = ref('all');
+
+const allTabs = [
     {
-        key: 'low-stock',
-        icon: '📉',
-        label: 'المخزون المنخفض',
-        unit: 'مادة',
-        hint: 'المواد التي بلغت حدّها الأدنى أو نفدت، مرتّبة من الأشدّ نقصًا',
+        key: 'profit',
+        group: 'finance',
+        icon: '📈',
+        label: 'الأرباح والخسائر',
+        badge: 'جديد',
+        unit: 'يوم',
+        hint: 'تقرير الأرباح الشامل: الإيرادات، تكلفة المواد المباعة، المصاريف التشغيلية، وصافي الربح المحقق',
     },
     {
         key: 'sales',
+        group: 'finance',
         icon: '🧾',
         label: 'ملخص المبيعات',
         unit: 'يوم',
@@ -279,6 +391,7 @@ const tabs = [
     },
     {
         key: 'purchases',
+        group: 'finance',
         icon: '📦',
         label: 'ملخص المشتريات',
         unit: 'يوم',
@@ -286,6 +399,7 @@ const tabs = [
     },
     {
         key: 'receivables',
+        group: 'finance',
         icon: '💰',
         label: 'ذمم العملاء',
         unit: 'حساب',
@@ -293,33 +407,69 @@ const tabs = [
     },
     {
         key: 'payables',
+        group: 'finance',
         icon: '💳',
         label: 'ذمم الموردين',
         unit: 'حساب',
         hint: 'أرصدة الموردين المستحقة علينا، من الأكبر إلى الأصغر',
     },
     {
-        key: 'technicians',
-        icon: '🧰',
-        label: 'محاسبة خبراء الصيانة',
-        unit: 'خبير',
-        hint: 'ما استحقّه كل خبير في الفترة وما صُرف له، ورصيده القائم',
-    },
-    {
-        key: 'technician-repairs',
-        icon: '🔧',
-        label: 'عمولات بلاغ بلاغ',
-        unit: 'بلاغ',
-        hint: 'كل بلاغ سُوِّي في الفترة، بتكلفته ونصيب الخبير منه',
+        key: 'low-stock',
+        group: 'inventory',
+        icon: '📉',
+        label: 'المخزون المنخفض',
+        unit: 'مادة',
+        hint: 'المواد التي بلغت حدّها الأدنى أو نفدت، مرتّبة من الأشدّ نقصًا',
     },
     {
         key: 'stock-movements',
+        group: 'inventory',
         icon: '🔄',
         label: 'حركات المخزون',
         unit: 'حركة',
         hint: 'سجل دخول وخروج المواد؛ اختيار مادة واحدة يُظهر الرصيد بعد كل حركة',
     },
+    {
+        key: 'technicians',
+        group: 'repairs',
+        icon: '🧰',
+        label: 'محاسبة خبراء الصيانة',
+        unit: 'خبير',
+        permission: 'reports.technicians',
+        features: ['repairs', 'technicians'],
+        hint: 'ما استحقّه كل خبير في الفترة وما صُرف له، ورصيده القائم',
+    },
+    {
+        key: 'technician-repairs',
+        group: 'repairs',
+        icon: '🔧',
+        label: 'عمولات بلاغ بلاغ',
+        unit: 'بلاغ',
+        permission: 'reports.technician_repairs',
+        features: ['repairs', 'technicians'],
+        hint: 'كل بلاغ سُوِّي في الفترة، بتكلفته ونصيب الخبير منه',
+    },
 ];
+
+/**
+ * A tab may need its own permission (on top of reports.view) and its modules switched on.
+ * A switched-off module hides its tabs even for Master.
+ * Permissions and features are loaded by the router guard before this view opens.
+ */
+function tabAllowed(tab) {
+    if (tab.permission && !can(tab.permission)) return false;
+    return (tab.features ?? []).every((f) => features.isEnabled(f));
+}
+
+// Repair revenue, technician commissions and top services drop out of the profit report with their modules.
+const showRepairs = features.isEnabled('repairs');
+const showTechnicians = showRepairs && features.isEnabled('technicians');
+const showServices = features.isEnabled('services');
+
+const tabs = allTabs.filter(tabAllowed);
+
+// Categories with no tab left for this user are dropped.
+const categories = categoryOptions.filter((cat) => cat.key === 'all' || tabs.some((tab) => tab.group === cat.key));
 
 const periodTabs = ['sales', 'purchases'];
 const partyTabs = ['receivables', 'payables'];
@@ -334,7 +484,7 @@ const movementTypes = [
     { value: 'OPENING', label: 'رصيد افتتاحي' },
 ];
 
-const DEFAULT_PER_PAGE = 50;
+const PAGE_SIZE = 50;
 const EXPORT_PAGE_SIZE = 200;
 const MAX_EXPORT_ROWS = 5000;
 
@@ -343,20 +493,34 @@ const router = useRouter();
 const toast = useToast();
 
 const tablist = ref(null);
-const current = ref('low-stock');
+const current = ref('profit');
 const loading = ref(true);
 const exporting = ref(false);
 const error = ref('');
-const page = ref(1);
-const perPage = ref(DEFAULT_PER_PAGE);
 
+/** Bumped on every fresh load so a late response can't land on a newer report. */
+let requestId = 0;
+/** A failed paged load, handed back from the list so load() can report it. */
+let pagedError = null;
+
+const profitSummaryData = ref(null);
 const lowStock = ref([]);
 const summary = ref(null);
-const parties = ref(null);
-const movements = ref(null);
-const technicianReport = ref(null);
-const meta = ref(null);
 const materials = ref([]);
+
+// The paginated tabs (balances, technicians, movements) grow as the user scrolls.
+const {
+    items: pagedRows, meta: pagedMeta, response: pagedResponse, loadingMore, moreError, hasMore,
+    reload: reloadPaged, loadMore,
+} = useInfiniteList({
+    fetch: (page, perPage) => fetcher()(requestParams({ page, per_page: perPage })),
+    pageSize: PAGE_SIZE,
+    maxPerPage: 200,
+    select: (result) => ({ rows: result?.rows ?? [], meta: result?.meta ?? null }),
+    onError: (e) => {
+        pagedError = e;
+    },
+});
 
 const defaults = () => ({
     from: isoDate(new Date(Date.now() - 29 * 864e5)),
@@ -373,12 +537,34 @@ const filters = reactive(defaults());
 /** Snapshot of the filters behind the data on screen, for the "unapplied" hint. */
 const applied = ref('');
 
+const visibleTabs = computed(() => {
+    if (selectedCategory.value === 'all') return tabs;
+    return tabs.filter((t) => t.group === selectedCategory.value);
+});
+
+function tabCountFor(categoryKey) {
+    if (categoryKey === 'all') return tabs.length;
+    return tabs.filter((t) => t.group === categoryKey).length;
+}
+
+function setCategory(catKey) {
+    selectedCategory.value = catKey;
+    // If current tab is not in selected category, pick first in that category
+    const inCategory = visibleTabs.value.some((t) => t.key === current.value);
+    if (!inCategory && visibleTabs.value.length) {
+        selectTab(visibleTabs.value[0].key);
+    }
+}
+
 const activeTab = computed(() => tabs.find((tab) => tab.key === current.value) ?? tabs[0]);
+
 const showDates = computed(() =>
-    periodTabs.includes(current.value)
+    current.value === 'profit'
+    || periodTabs.includes(current.value)
     || technicianTabs.includes(current.value)
     || current.value === 'stock-movements'
 );
+
 const showSearch = computed(() =>
     current.value === 'low-stock' || partyTabs.includes(current.value) || current.value === 'technicians'
 );
@@ -390,6 +576,7 @@ const presets = computed(() => {
         { key: 'month', label: 'هذا الشهر' },
         { key: 'last-month', label: 'الشهر الماضي' },
         { key: '30', label: 'آخر ٣٠ يومًا' },
+        { key: 'quarter', label: 'هذا الربع' },
         { key: 'year', label: 'هذه السنة' },
     ];
 
@@ -412,18 +599,40 @@ const canReset = computed(() => filterSnapshot() !== snapshotOf(defaults()));
 
 const skeletonColumns = computed(() => (current.value === 'stock-movements' ? 7 : 6));
 
+const isPaged = computed(() =>
+    partyTabs.includes(current.value) || technicianTabs.includes(current.value) || current.value === 'stock-movements'
+);
+
+const meta = computed(() => (isPaged.value ? pagedMeta.value : null));
+
+/** Totals cover the whole report; only the rows grow as the user scrolls. */
+const pagedReport = computed(() => (pagedResponse.value ? { ...pagedResponse.value, rows: pagedRows.value } : null));
+
 const hasRows = computed(() => !loading.value && !error.value && !isEmpty.value);
 
 const isEmpty = computed(() => {
+    if (current.value === 'profit') {
+        return !profitSummaryData.value || (
+            !Number(profitSummaryData.value.revenue?.total)
+            && !Number(profitSummaryData.value.operating_expenses?.total)
+            && !Number(profitSummaryData.value.technician_commissions?.total)
+        );
+    }
     if (current.value === 'low-stock') return !lowStock.value.length;
     if (periodTabs.includes(current.value)) return !summary.value || !Number(summary.value.count);
-    if (partyTabs.includes(current.value)) return !(parties.value?.rows || []).length;
-    if (technicianTabs.includes(current.value)) return !(technicianReport.value?.rows || []).length;
-    return !(movements.value?.rows || []).length;
+    return !pagedRows.value.length;
 });
 
 const emptyState = computed(() => {
     const filtered = canReset.value;
+
+    if (current.value === 'profit') {
+        return {
+            icon: '📊',
+            title: 'لا توجد حركات أرباح أو مصاريف في هذه الفترة',
+            hint: filtered ? 'جرّب توسيع نطاق التواريخ أو اختيار فترة أخرى' : 'ستظهر أرباح وتكاليف الفواتير المعتمدة هنا فور تسجيلها',
+        };
+    }
 
     if (current.value === 'low-stock') {
         return filtered
@@ -524,6 +733,13 @@ function presetRange(key) {
             };
         case '30':
             return { from: start(new Date(Date.now() - 29 * 864e5)), to: start(today) };
+        case 'quarter': {
+            const quarterMonth = Math.floor(today.getMonth() / 3) * 3;
+            return {
+                from: start(new Date(today.getFullYear(), quarterMonth, 1)),
+                to: start(today),
+            };
+        }
         case 'year':
             return { from: start(new Date(today.getFullYear(), 0, 1)), to: start(today) };
         case 'all':
@@ -541,7 +757,6 @@ function applyPreset(preset) {
 }
 
 function applyFilters() {
-    page.value = 1;
     load();
 }
 
@@ -554,12 +769,16 @@ function selectTab(key) {
     if (current.value === key) return;
 
     current.value = key;
-    page.value = 1;
-    meta.value = null;
+
+    // Make sure the category matches if it's currently on a specific category
+    const tabObj = tabs.find((t) => t.key === key);
+    if (tabObj && selectedCategory.value !== 'all' && tabObj.group !== selectedCategory.value) {
+        selectedCategory.value = 'all';
+    }
 
     // Only the movement log may run without a period; carrying its empty dates
     // into a summary would just bounce off the API's "from is required".
-    if (periodTabs.includes(key) && (!filters.from || !filters.to)) {
+    if ((key === 'profit' || periodTabs.includes(key)) && (!filters.from || !filters.to)) {
         const fallback = defaults();
         filters.from = fallback.from;
         filters.to = fallback.to;
@@ -575,26 +794,16 @@ function onTabKeydown(event) {
 
     event.preventDefault();
 
-    const index = tabs.findIndex((tab) => tab.key === current.value);
+    const currentList = visibleTabs.value;
+    const index = currentList.findIndex((tab) => tab.key === current.value);
     const target = offset === 'first'
         ? 0
         : offset === 'last'
-            ? tabs.length - 1
-            : (index + offset + tabs.length) % tabs.length;
+            ? currentList.length - 1
+            : (index + offset + currentList.length) % currentList.length;
 
-    selectTab(tabs[target].key);
+    selectTab(currentList[target].key);
     tablist.value?.children[target]?.focus();
-}
-
-function goTo(target) {
-    page.value = target;
-    load();
-}
-
-function changePerPage(size) {
-    perPage.value = size;
-    page.value = 1;
-    load();
 }
 
 function printSheet() {
@@ -623,15 +832,12 @@ function currentQuery() {
         if (filters.movementType) query.type = filters.movementType;
     }
 
-    if (page.value > 1) query.page = String(page.value);
-    if (perPage.value !== DEFAULT_PER_PAGE) query.per_page = String(perPage.value);
-
     return query;
 }
 
 function readQuery(query) {
     const tab = tabs.find((item) => item.key === query.tab);
-    current.value = tab ? tab.key : 'low-stock';
+    current.value = tab ? tab.key : 'profit';
 
     Object.assign(filters, defaults());
 
@@ -647,9 +853,6 @@ function readQuery(query) {
     if (query.all === '1') filters.onlyOutstanding = false;
     if (query.material_id) filters.materialId = Number(query.material_id);
     if (query.type) filters.movementType = String(query.type);
-
-    page.value = Math.max(1, Number(query.page) || 1);
-    perPage.value = Number(query.per_page) || DEFAULT_PER_PAGE;
 }
 
 function syncQuery() {
@@ -662,13 +865,13 @@ function syncQuery() {
 // --------------------------------------------------------------------- loading
 
 function requestParams(overrides = {}) {
-    const params = { page: page.value, per_page: perPage.value, ...overrides };
+    const params = { page: 1, per_page: PAGE_SIZE, ...overrides };
 
     if (current.value === 'low-stock') {
         return filters.search ? { search: filters.search } : {};
     }
 
-    if (periodTabs.includes(current.value)) {
+    if (current.value === 'profit' || periodTabs.includes(current.value)) {
         return { from: filters.from, to: filters.to };
     }
 
@@ -704,38 +907,34 @@ function fetcher() {
 }
 
 async function load() {
+    const id = ++requestId;
     loading.value = true;
     error.value = '';
 
     try {
-        if (current.value === 'low-stock') {
+        if (current.value === 'profit') {
+            profitSummaryData.value = await reportsApi.profitSummary(requestParams());
+        } else if (current.value === 'low-stock') {
             lowStock.value = await reportsApi.lowStock(requestParams());
-            meta.value = null;
         } else if (periodTabs.includes(current.value)) {
             const params = requestParams();
             summary.value = current.value === 'sales'
                 ? await reportsApi.salesSummary(params)
                 : await reportsApi.purchasesSummary(params);
-            meta.value = null;
-        } else if (partyTabs.includes(current.value)) {
-            parties.value = await fetcher()(requestParams());
-            meta.value = parties.value.meta ?? null;
-        } else if (technicianTabs.includes(current.value)) {
-            technicianReport.value = current.value === 'technicians'
-                ? await reportsApi.technicianSummary(requestParams())
-                : await reportsApi.technicianRepairs(requestParams());
-            meta.value = technicianReport.value.meta ?? null;
         } else {
-            movements.value = await reportsApi.stockMovements(requestParams());
-            meta.value = movements.value.meta ?? null;
+            pagedError = null;
+            await reloadPaged();
+            if (pagedError) throw pagedError;
         }
 
+        if (id !== requestId) return;
         applied.value = filterSnapshot();
         syncQuery();
     } catch (e) {
+        if (id !== requestId) return;
         error.value = e?.response?.data?.message || 'تعذّر تحميل التقرير';
     } finally {
-        loading.value = false;
+        if (id === requestId) loading.value = false;
     }
 }
 
@@ -769,6 +968,52 @@ async function fetchAllRows() {
 }
 
 async function exportPayload() {
+    if (current.value === 'profit') {
+        const p = profitSummaryData.value;
+        const rows = (p.by_day ?? []).map((day) => ({
+            date: day.date,
+            invoices: day.count,
+            revenue: day.revenue,
+            cogs: day.cogs,
+            gross_profit: day.gross_profit,
+            expenses: day.expenses,
+            commissions: day.commissions,
+            operating_costs: day.operating_costs,
+            net_profit: day.net_profit,
+            margin: `${day.margin_percent}%`,
+        }));
+
+        rows.push({
+            date: 'الإجمالي العام للفترة',
+            invoices: p.revenue.invoices_count,
+            revenue: p.revenue.total,
+            cogs: p.cogs.total,
+            gross_profit: p.gross_profit.total,
+            expenses: p.operating_expenses.total,
+            commissions: p.technician_commissions.total,
+            operating_costs: p.operating_costs.total,
+            net_profit: p.net_profit.total,
+            margin: `${p.net_profit.margin_percent}%`,
+        });
+
+        return {
+            filename: `profit-report-${filters.from}_${filters.to}`,
+            columns: [
+                { label: 'التاريخ', value: (row) => row.date },
+                { label: 'عدد الفواتير', value: (row) => row.invoices },
+                { label: `الإيرادات (${BASE_SYMBOL})`, value: (row) => csvNumber(row.revenue) },
+                { label: `تكلفة المواد (COGS) (${BASE_SYMBOL})`, value: (row) => csvNumber(row.cogs) },
+                { label: `إجمالي الربح (${BASE_SYMBOL})`, value: (row) => csvNumber(row.gross_profit) },
+                { label: `المصاريف التشغيلية (${BASE_SYMBOL})`, value: (row) => csvNumber(row.expenses) },
+                showTechnicians && { label: `عمولات الفنيين (${BASE_SYMBOL})`, value: (row) => csvNumber(row.commissions) },
+                { label: `إجمالي التكاليف (${BASE_SYMBOL})`, value: (row) => csvNumber(row.operating_costs) },
+                { label: `صافي الربح (${BASE_SYMBOL})`, value: (row) => csvNumber(row.net_profit) },
+                { label: 'هامش الربح', value: (row) => row.margin },
+            ].filter(Boolean),
+            rows,
+        };
+    }
+
     if (current.value === 'low-stock') {
         return {
             filename: `low-stock-${isoDate()}`,
@@ -779,8 +1024,8 @@ async function exportPayload() {
                 { label: 'الكمية الحالية', value: (row) => csvNumber(row.stock_quantity, 3) },
                 { label: 'الحد الأدنى', value: (row) => csvNumber(row.min_stock, 3) },
                 { label: 'النقص', value: (row) => csvNumber(row.shortfall, 3) },
-                { label: 'تكلفة', value: (row) => csvNumber(row.cost_price) },
-                { label: 'سعر بيع', value: (row) => csvNumber(row.sale_price) },
+                { label: `تكلفة (${BASE_SYMBOL})`, value: (row) => csvNumber(row.cost_price) },
+                { label: `سعر بيع (${BASE_SYMBOL})`, value: (row) => csvNumber(row.sale_price) },
                 { label: 'الحالة', value: (row) => (row.is_out_of_stock ? 'نفد' : 'قرب النفاد') },
             ],
             rows: lowStock.value,
@@ -804,9 +1049,9 @@ async function exportPayload() {
             columns: [
                 { label: 'التاريخ', value: (row) => row.date },
                 { label: 'العدد', value: (row) => row.count },
-                { label: 'الإجمالي', value: (row) => csvNumber(row.total) },
-                { label: 'المدفوع', value: (row) => csvNumber(row.paid) },
-                { label: 'المتبقي', value: (row) => csvNumber(row.outstanding) },
+                { label: `الإجمالي (${BASE_SYMBOL})`, value: (row) => csvNumber(row.total) },
+                { label: `المدفوع (${BASE_SYMBOL})`, value: (row) => csvNumber(row.paid) },
+                { label: `المتبقي (${BASE_SYMBOL})`, value: (row) => csvNumber(row.outstanding) },
             ],
             rows,
         };
@@ -821,10 +1066,10 @@ async function exportPayload() {
                 { label: 'الهاتف', value: (row) => row.phone },
                 { label: 'النسبة ٪', value: (row) => csvNumber(row.commission_rate) },
                 { label: 'بلاغات الفترة', value: (row) => row.repairs_count },
-                { label: 'إيراد البلاغات', value: (row) => csvNumber(row.revenue) },
-                { label: 'استحقّ في الفترة', value: (row) => csvNumber(row.commission) },
-                { label: 'صُرف في الفترة', value: (row) => csvNumber(row.paid) },
-                { label: 'الرصيد المستحق له', value: (row) => csvNumber(row.balance) },
+                { label: `إيراد البلاغات (${BASE_SYMBOL})`, value: (row) => csvNumber(row.revenue) },
+                { label: `استحقّ في الفترة (${BASE_SYMBOL})`, value: (row) => csvNumber(row.commission) },
+                { label: `صُرف في الفترة (${BASE_SYMBOL})`, value: (row) => csvNumber(row.paid) },
+                { label: `الرصيد المستحق له (${BASE_SYMBOL})`, value: (row) => csvNumber(row.balance) },
             ],
             rows: await fetchAllRows(),
         };
@@ -839,9 +1084,9 @@ async function exportPayload() {
                 { label: 'الخبير', value: (row) => row.technician },
                 { label: 'العميل', value: (row) => row.customer },
                 { label: 'الجهاز', value: (row) => row.device },
-                { label: 'التكلفة النهائية', value: (row) => csvNumber(row.final_cost) },
+                { label: `التكلفة النهائية (${BASE_SYMBOL})`, value: (row) => csvNumber(row.final_cost) },
                 { label: 'النسبة ٪', value: (row) => csvNumber(row.commission_rate) },
-                { label: 'نصيب الخبير', value: (row) => csvNumber(row.commission_amount) },
+                { label: `نصيب الخبير (${BASE_SYMBOL})`, value: (row) => csvNumber(row.commission_amount) },
             ],
             rows: await fetchAllRows(),
         };
@@ -854,8 +1099,8 @@ async function exportPayload() {
                 { label: 'الاسم', value: (row) => row.name },
                 { label: 'الشركة', value: (row) => row.company },
                 { label: 'الهاتف', value: (row) => row.phone },
-                { label: 'الرصيد الافتتاحي', value: (row) => csvNumber(row.opening_balance) },
-                { label: 'الرصيد', value: (row) => csvNumber(row.balance) },
+                { label: `الرصيد الافتتاحي (${BASE_SYMBOL})`, value: (row) => csvNumber(row.opening_balance) },
+                { label: `الرصيد (${BASE_SYMBOL})`, value: (row) => csvNumber(row.balance) },
             ],
             rows: await fetchAllRows(),
         };
@@ -871,7 +1116,7 @@ async function exportPayload() {
             { label: 'المرجع', value: (row) => row.reference_no },
             { label: 'الكمية', value: (row) => csvNumber(row.signed_quantity, 3) },
             { label: 'الرصيد بعد الحركة', value: (row) => csvNumber(row.running_quantity, 3) },
-            { label: 'سعر الوحدة', value: (row) => csvNumber(row.unit_price) },
+            { label: `سعر الوحدة (${BASE_SYMBOL})`, value: (row) => csvNumber(row.unit_price) },
             { label: 'أُنشئت بواسطة', value: (row) => row.created_by },
         ],
         rows: await fetchAllRows(),
@@ -884,7 +1129,7 @@ async function exportCsv() {
     try {
         const { filename, columns, rows } = await exportPayload();
         downloadCsv(filename, columns, rows);
-        toast.success(`تم تصدير ${rows.length} سطرًا`);
+        toast.success(`تم تصدير ${rows.length} سطرًا بنجاح`);
     } catch {
         toast.error('تعذّر تصدير التقرير');
     } finally {
@@ -912,7 +1157,7 @@ onMounted(() => {
 <style>
 @media print {
     @page {
-        margin: 12mm;
+        margin: 10mm;
     }
 
     body {
@@ -931,12 +1176,13 @@ onMounted(() => {
         break-inside: avoid;
     }
 
-    /* Tailwind's print:hidden covers the controls; these are the coloured
-       surfaces that only cost ink. */
+    /* Print styles */
     #report-sheet .bg-slate-50\/60,
+    #report-sheet .bg-slate-50\/70,
     #report-sheet [class*="bg-emerald-50"],
     #report-sheet [class*="bg-amber-50"],
-    #report-sheet [class*="bg-red-50"] {
+    #report-sheet [class*="bg-red-50"],
+    #report-sheet [class*="bg-rose-50"] {
         background: #fff !important;
     }
 }

@@ -39,7 +39,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="loading" class="text-slate-400"><td colspan="6" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
+                        <tr v-if="loading && !items.length" class="text-slate-400"><td colspan="6" class="px-4 py-8 text-center">جارٍ التحميل...</td></tr>
                         <tr v-else-if="!items.length" class="text-slate-400">
                             <td colspan="6" class="px-4 py-10 text-center">
                                 <template v-if="archivedView && !search && !typeFilter">
@@ -87,15 +87,16 @@
                     </tbody>
                 </table>
             </div>
-            <div v-if="meta" class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-                <span>صفحة {{ meta.current_page }} من {{ meta.last_page }} — {{ meta.total }}</span>
-                <div class="flex gap-2">
-                    <button :disabled="!meta.prev_page_url"
-                        class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page--">السابق</button>
-                    <button :disabled="!meta.next_page_url"
-                        class="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40" @click="page++">التالي</button>
-                </div>
-            </div>
+            <InfiniteScrollFooter
+                :shown="items.length"
+                :total="meta?.total ?? 0"
+                :has-more="hasMore"
+                :loading-more="loadingMore"
+                :busy="loading"
+                :error="moreError"
+                unit="خدمة"
+                @more="loadMore"
+            />
         </div>
 
         <BaseModal :open="modalOpen" :title="editing ? 'تعديل خدمة' : 'خدمة جديدة'" @close="modalOpen = false">
@@ -114,15 +115,26 @@ import { useCatalogArchive } from '../../composables/useCatalogArchive';
 import ArchiveTabs from '../../components/ui/ArchiveTabs.vue';
 import BaseModal from '../../components/ui/BaseModal.vue';
 import ServiceForm from '../../components/forms/ServiceForm.vue';
+import { useInfiniteList } from '../../composables/useInfiniteList';
+import InfiniteScrollFooter from '../../components/ui/InfiniteScrollFooter.vue';
+import { apiMessage } from '../../utils/format';
+import { useToast } from '../../composables/useToast';
 
 const { can } = usePermissions();
+const toast = useToast();
 const auth = useAuthStore();
-const items = ref([]);
-const meta = ref(null);
-const loading = ref(false);
+const { items, meta, response, loading, loadingMore, moreError, hasMore, reload: fetchData, loadMore } = useInfiniteList({
+    fetch: (page, perPage) => servicesApi.index({
+        search: search.value || undefined,
+        type: typeFilter.value || undefined,
+        status: archivedView.value ? 'archived' : undefined,
+        page,
+        per_page: perPage,
+    }),
+    onError: (e) => toast.error(apiMessage(e, 'تعذّر تحميل القائمة')),
+});
 const search = ref('');
 const typeFilter = ref('');
-const page = ref(1);
 const modalOpen = ref(false);
 const editing = ref(null);
 const view = ref('active');
@@ -133,43 +145,29 @@ let t = null;
 const { busyId, archive, restore, forceDelete } = useCatalogArchive({
     api: servicesApi,
     noun: 'الخدمة',
-    onChange: fetchData,
+    onChange: () => fetchData({ keep: true }),
 });
 
-// Resetting the page refetches through its own watcher.
-watch(view, () => { if (page.value !== 1) page.value = 1; else fetchData(); });
+watch(view, () => fetchData());
 
 watch([search, typeFilter], () => {
     clearTimeout(t);
-    t = setTimeout(() => { page.value = 1; fetchData(); }, 350);
+    t = setTimeout(() => fetchData(), 350);
 });
-watch(page, fetchData);
 
-async function fetchData() {
-    loading.value = true;
-    try {
-        const data = await servicesApi.index({
-            search: search.value || undefined,
-            type: typeFilter.value || undefined,
-            status: archivedView.value ? 'archived' : undefined,
-            page: page.value,
-            per_page: 15,
-        });
-        items.value = data.data ?? data;
-        meta.value = data.meta ?? null;
-        archivedCount.value = data.counts?.archived ?? 0;
-        // The last archived row restored: nothing left to look at here.
-        if (archivedView.value && !items.value.length && archivedCount.value === 0 && page.value === 1) {
-            view.value = 'active';
-        }
-    } finally {
-        loading.value = false;
-    }
-}
 
 function openCreate() { editing.value = null; modalOpen.value = true; }
 function openEdit(row) { editing.value = row; modalOpen.value = true; }
-function onSaved() { fetchData(); }
+watch(response, (data) => {
+    if (!data) return;
+    archivedCount.value = data.counts?.archived ?? 0;
+    // The last archived row restored: nothing left to look at here.
+    if (archivedView.value && !items.value.length && archivedCount.value === 0) {
+        view.value = 'active';
+    }
+});
+
+function onSaved() { fetchData({ keep: true }); }
 
 function archiveRow(row) {
     archive(row, { detail: `السعر الافتراضي: ${formatMoney(row.default_price)}` });
