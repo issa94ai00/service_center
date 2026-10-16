@@ -16,7 +16,7 @@ api.interceptors.response.use(
     (error) => {
         // A 401 on the "who am I" probe just means a guest is browsing (e.g. the
         // public home page); the router guard decides whether they need to sign in.
-        const isSessionProbe = error.config?.url === '/user';
+        const isSessionProbe = ['/user', '/admin/me'].includes(error.config?.url);
         if (error.response?.status === 401 && !isSessionProbe) {
             const inLogin = window.location.pathname === '/login';
             if (!inLogin) {

@@ -45,7 +45,9 @@
 
             <div>
                 <h2 class="text-2xl font-bold text-slate-900">تسجيل الدخول</h2>
-                <p class="mt-1 text-sm text-slate-500">أدخل بيانات حسابك للوصول إلى لوحة التحكم</p>
+                <p class="mt-1 text-sm text-slate-500">
+                    <template v-if="tenancy.tenant">متجر <strong class="text-slate-700">{{ tenancy.tenant.name }}</strong> — </template>أدخل بيانات حسابك للوصول إلى لوحة التحكم
+                </p>
             </div>
 
             <form class="mt-8 space-y-5" novalidate @submit.prevent="submit">
@@ -162,13 +164,14 @@
                 </button>
 
                 <div class="pt-4 text-center border-t border-slate-100">
-                    <router-link
-                        :to="{ name: 'landing' }"
+                    <component
+                        :is="homeLink.is"
+                        v-bind="homeLink.attrs"
                         class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 font-medium transition-colors"
                     >
                         <span>تعرّف على مزايا النظام</span>
                         <span>←</span>
-                    </router-link>
+                    </component>
                 </div>
             </form>
         </div>
@@ -179,6 +182,7 @@
 import { reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
+import { tenancy } from '../../tenancy';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -205,6 +209,11 @@ if (storedEmail) {
     form.email = storedEmail;
     remember.value = true;
 }
+
+// On a shop's own host the landing page lives on the central domain.
+const homeLink = tenancy.mode === 'tenant'
+    ? { is: 'a', attrs: { href: `https://${tenancy.centralDomain}/` } }
+    : { is: 'router-link', attrs: { to: { name: 'landing' } } };
 
 const features = [
     { icon: '🧾', title: 'فواتير المبيعات والمشتريات', desc: 'إصدار وطباعة ومتابعة الحسابات من مكان واحد' },

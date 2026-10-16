@@ -1,15 +1,26 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useFeaturesStore } from '../stores/features';
+import { tenancy } from '../tenancy';
+import { createAdminRouter } from './admin';
+import { createCentralRouter } from './central';
+
+// The landing page belongs to the public site; a shop's own host opens on its
+// dashboard (or sign-in). Without tenancy (local development) both live here.
+const entryRoutes = tenancy.mode === 'tenant'
+    ? [{ path: '/', redirect: { name: 'dashboard' } }]
+    : [
+        {
+            path: '/',
+            name: 'landing',
+            component: () => import('../views/landing/LandingView.vue'),
+            meta: { guest: true },
+        },
+        { path: '/landing', redirect: '/' },
+    ];
 
 const routes = [
-    {
-        path: '/',
-        name: 'landing',
-        component: () => import('../views/landing/LandingView.vue'),
-        meta: { guest: true },
-    },
-    { path: '/landing', redirect: '/' },
+    ...entryRoutes,
     {
         path: '/login',
         name: 'login',
@@ -209,45 +220,55 @@ const routes = [
     },
 ];
 
-const router = createRouter({
-    history: createWebHistory(),
-    routes,
-});
+function createShopRouter() {
+    const router = createRouter({
+        history: createWebHistory(),
+        routes,
+    });
 
-router.beforeEach(async (to) => {
-    const auth = useAuthStore();
-    const features = useFeaturesStore();
+    router.beforeEach(async (to) => {
+        const auth = useAuthStore();
+        const features = useFeaturesStore();
 
-    if (!auth.initialized) {
-        await auth.fetchUser();
-    }
+        if (!auth.initialized) {
+            await auth.fetchUser();
+        }
 
-    if (to.meta.requiresAuth && !auth.isAuthenticated) {
-        return { name: 'login', query: { redirect: to.fullPath } };
-    }
+        if (to.meta.requiresAuth && !auth.isAuthenticated) {
+            return { name: 'login', query: { redirect: to.fullPath } };
+        }
 
-    if (to.meta.guest && auth.isAuthenticated) {
-        return { name: 'dashboard' };
-    }
+        if (to.meta.guest && auth.isAuthenticated) {
+            return { name: 'dashboard' };
+        }
 
-    if (!features.loaded && auth.isAuthenticated) {
-        await features.fetchFeatures();
-    }
+        if (!features.loaded && auth.isAuthenticated) {
+            await features.fetchFeatures();
+        }
 
-    // Feature toggle guard (master user bypasses)
-    if (to.meta.feature && !auth.isMaster && !features.isEnabled(to.meta.feature)) {
-        return { name: 'dashboard' };
-    }
+        // Feature toggle guard (master user bypasses)
+        if (to.meta.feature && !auth.isMaster && !features.isEnabled(to.meta.feature)) {
+            return { name: 'dashboard' };
+        }
 
-    if (to.meta.check && !to.meta.check(auth)) {
-        return { name: 'dashboard' };
-    }
+        if (to.meta.check && !to.meta.check(auth)) {
+            return { name: 'dashboard' };
+        }
 
-    // Routes may declare a required permission; without this a user lands on a
-    // screen whose every request comes back 403.
-    if (to.meta.permission && !auth.hasPermission(to.meta.permission)) {
-        return { name: 'dashboard' };
-    }
-});
+        // Routes may declare a required permission; without this a user lands on a
+        // screen whose every request comes back 403.
+        if (to.meta.permission && !auth.hasPermission(to.meta.permission)) {
+            return { name: 'dashboard' };
+        }
+    });
+
+    return router;
+}
+
+const router = tenancy.mode === 'admin'
+    ? createAdminRouter()
+    : tenancy.mode === 'central'
+        ? createCentralRouter()
+        : createShopRouter();
 
 export default router;

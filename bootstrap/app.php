@@ -9,6 +9,7 @@ use App\Exceptions\BusinessRuleException;
 use App\Http\Middleware\CheckFeature;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\IdentifyTenant;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Pick the shop (and its database) by host before anything — the session
+        // included — touches the database.
+        $middleware->prepend(IdentifyTenant::class);
+
         $middleware->statefulApi();
         $middleware->alias([
             'permission' => CheckPermission::class,

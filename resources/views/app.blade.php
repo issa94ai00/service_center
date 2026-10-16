@@ -12,7 +12,8 @@
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="الهواتف" />
         <meta name="description" content="نظام متكامل لمحلات الهواتف ومراكز الصيانة: المبيعات والمشتريات، استلام أجهزة الصيانة وتتبّعها، المخزون والصندوق والتقارير — من داماتك لتقنية المعلومات." />
-        <title>{{ config('app.name') }}</title>
+        <title>{{ app(\App\Tenancy\Tenancy::class)->tenant()?->name ?? config('app.name') }}</title>
+        <script>window.__TENANCY__ = @json(app(\App\Tenancy\Tenancy::class)->frontendContext());</script>
         @vite(['resources/js/app.js'])
     </head>
     <body>

@@ -179,3 +179,52 @@ session cookie is issued with the `Secure` flag.
 
 - **No backups.** There is no dump of `shdamatechsy_db` scheduled. For an
   accounting system this is the largest remaining operational gap.
+
+## Multi-tenancy (repair.damatech.sy)
+
+With `TENANCY_ENABLED=true` the app serves three kinds of host (`config/tenancy.php`):
+
+| Host | Serves | Database |
+|------|--------|----------|
+| `repair.damatech.sy` | Landing page + "find your shop" | `repair_central` |
+| `admin.repair.damatech.sy` | Platform admin: create / suspend / archive shops, subscriptions, modules | `repair_central` |
+| `<slug>.repair.damatech.sy` | One shop's system | `repair_t_<slug>` |
+
+The original single-shop data lives on as the `main` shop (`repair_t_main`). The
+pre-tenancy database `repair_db` is left untouched as a fallback; a dump is in
+`/var/backups/repair/`.
+
+**Deploy** — plain `php artisan migrate` is refused while tenancy is on (it would
+build shop tables in the central database). Use:
+
+```bash
+php artisan tenants:migrate          # central first, then every shop
+```
+
+**Shops**
+
+```bash
+php artisan tenancy:admin admin@damatech.sy             # create a platform admin / reset its password
+php artisan tenants:create <slug> "<name>" <owner-email> # same as the admin panel's "new shop"
+php artisan tenants:certificate <slug> | --pending      # issue/retry HTTPS for shops
+```
+
+**HTTPS** — each shop gets its own Let's Encrypt certificate (webroot) and a
+server block in `/etc/nginx/repair-tenants/`, issued the moment the shop is
+created (or from the admin panel's retry button). The shared vhost body is
+`/etc/nginx/snippets/repair-app.conf`; DNS already has `*.repair.damatech.sy`.
+
+PHP-FPM runs with `ProtectSystem=full`, so nothing it spawns can write
+`/etc/letsencrypt`. The app therefore calls
+`sudo -n /usr/local/sbin/repair-tenant-site-request <host>` (the only command
+`/etc/sudoers.d/repair-tenant-site` allows the `repair` user), which validates the
+host and starts the one-shot unit `repair-tenant-site@<host>.service`. That unit
+runs `/usr/local/sbin/repair-tenant-site <host>` outside the sandbox: certbot
+(3 attempts), the server block, `nginx -t`, reload, and a wait until the new
+certificate is served. Logs: `journalctl -u 'repair-tenant-site@*'`.
+`php artisan tenants:certificate <slug>` does the same from the shell, and the
+scheduler retries `--pending` shops hourly if its cron is installed.
+
+The `.env` keys involved: `TENANCY_*`, `DB_DATABASE`/`DB_CENTRAL_DATABASE`
+(`repair_central`), `SESSION_DOMAIN=null` (cookies stay per host),
+`SESSION_COOKIE`, and `SANCTUM_STATEFUL_DOMAINS` including `*.repair.damatech.sy`.

@@ -27,6 +27,9 @@ use App\Http\Controllers\Api\TechniciansController;
 use App\Http\Controllers\Api\UsersController;
 use Illuminate\Support\Facades\Route;
 
+// Platform admin API, answered only on admin.<central domain> (IdentifyTenant).
+Route::prefix('admin')->group(base_path('routes/admin.php'));
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
