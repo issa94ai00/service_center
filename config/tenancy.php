@@ -47,6 +47,16 @@ return [
         'reports' => 'التقارير',
     ],
 
+    // Self-service sign-up on the public site (/register). Each sign-up creates a
+    // shop on a free trial that the admin panel can extend or convert.
+    'signup' => [
+        'enabled' => (bool) env('TENANCY_SIGNUP_ENABLED', true),
+        'trial_days' => (int) env('TENANCY_SIGNUP_TRIAL_DAYS', 14),
+        // Ceiling on sign-ups across all visitors per day — each one creates a
+        // database and a Let's Encrypt certificate (50 per week per domain).
+        'daily_limit' => (int) env('TENANCY_SIGNUP_DAILY_LIMIT', 20),
+    ],
+
     // Cookies the single-shop install set for the whole central domain, expired
     // on every response so they stop shadowing the per-host ones. Remove once
     // they have aged out (sessions last SESSION_LIFETIME minutes).

@@ -140,6 +140,9 @@ class Tenancy
         return [
             'mode' => $this->context,
             'centralDomain' => config('tenancy.central_domain'),
+            'signup' => $this->context === self::CENTRAL && config('tenancy.signup.enabled')
+                ? ['trialDays' => (int) config('tenancy.signup.trial_days')]
+                : null,
             'tenant' => $this->tenant ? [
                 'name' => $this->tenant->name,
                 'slug' => $this->tenant->slug,

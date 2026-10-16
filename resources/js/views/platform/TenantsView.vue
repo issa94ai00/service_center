@@ -64,6 +64,7 @@
                                 <router-link :to="{ name: 'tenant', params: { id: t.id } }" class="font-semibold text-slate-900 hover:text-blue-700" @click.stop>
                                     {{ t.name }}
                                 </router-link>
+                                <span v-if="t.source === 'signup'" class="ms-2 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">تسجيل ذاتي</span>
                                 <a :href="t.url" target="_blank" rel="noopener" class="block font-mono text-xs text-blue-600 hover:underline" dir="ltr" @click.stop>
                                     {{ t.host }}
                                 </a>

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Central\Admin;
 use App\Models\Central\Tenant;
 use App\Tenancy\Tenancy;
+use App\Tenancy\TenantManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -211,5 +212,125 @@ class TenancyTest extends TestCase
             ->assertOk();
 
         $this->assertNull(Tenant::query()->find($tenant->id));
+    }
+
+    private function signupPayload(array $overrides = []): array
+    {
+        return $overrides + [
+            'shop_name' => 'Al Nour Phones',
+            'slug' => 'nour-phones',
+            'owner_name' => 'Owner',
+            'phone' => '0999123456',
+            'email' => 'owner@example.com',
+            'password' => 'password-123',
+            'password_confirmation' => 'password-123',
+            'terms' => true,
+        ];
+    }
+
+    /** Provisioning needs MySQL; record the call and register the shop instead. */
+    private function fakeProvisioning(): void
+    {
+        $this->partialMock(TenantManager::class, function ($mock) {
+            $mock->shouldReceive('create')->andReturnUsing(fn (array $data) => Tenant::query()->create([
+                'slug' => $data['slug'],
+                'name' => $data['name'],
+                'database' => Tenancy::databaseFor($data['slug']),
+                'status' => Tenant::STATUS_ACTIVE,
+                'source' => $data['source'],
+                'signup_ip' => $data['signup_ip'],
+                'plan' => $data['plan'],
+                'expires_at' => $data['expires_at'],
+                'owner_name' => $data['owner_name'],
+                'owner_email' => $data['owner_email'],
+                'contact_phone' => $data['contact_phone'],
+                'ssl_status' => 'issued',
+            ]));
+        });
+    }
+
+    public function test_slug_check_reports_availability(): void
+    {
+        $this->tenant();
+
+        $this->getJson('http://repair.test/api/public/slug-check?slug=fresh')->assertJson(['available' => true]);
+        $this->getJson('http://repair.test/api/public/slug-check?slug=alnour')->assertJson(['available' => false, 'reason' => 'taken']);
+        $this->getJson('http://repair.test/api/public/slug-check?slug=admin')->assertJson(['reason' => 'reserved']);
+        $this->getJson('http://repair.test/api/public/slug-check?slug=Bad_')->assertJson(['reason' => 'invalid']);
+    }
+
+    public function test_public_api_is_only_on_the_central_domain(): void
+    {
+        $this->tenant();
+
+        $this->getJson('http://alnour.repair.test/api/public/slug-check?slug=x')->assertNotFound();
+        $this->getJson('http://admin.repair.test/api/public/slug-check?slug=x')->assertNotFound();
+    }
+
+    public function test_signup_creates_a_trial_shop(): void
+    {
+        config(['tenancy.signup.trial_days' => 14]);
+        $this->fakeProvisioning();
+
+        $this->postJson('http://repair.test/api/public/register', $this->signupPayload())
+            ->assertCreated()
+            ->assertJsonPath('data.host', 'nour-phones.repair.test')
+            ->assertJsonPath('data.login_url', 'https://nour-phones.repair.test/login')
+            ->assertJsonPath('data.expires_at', now()->addDays(14)->toDateString());
+
+        $tenant = Tenant::query()->where('slug', 'nour-phones')->firstOrFail();
+        $this->assertSame('signup', $tenant->source);
+        $this->assertSame('owner@example.com', $tenant->owner_email);
+        $this->assertNotNull($tenant->signup_ip);
+    }
+
+    public function test_signup_validates_its_input(): void
+    {
+        $this->fakeProvisioning();
+        $this->tenant(['source' => 'signup', 'owner_email' => 'taken@example.com']);
+
+        $this->postJson('http://repair.test/api/public/register', $this->signupPayload([
+            'slug' => 'admin',
+            'email' => 'taken@example.com',
+            'password_confirmation' => 'different',
+            'terms' => false,
+        ]))->assertJsonValidationErrors(['slug', 'email', 'password', 'terms']);
+
+        $this->postJson('http://repair.test/api/public/register', $this->signupPayload(['slug' => 'alnour']))
+            ->assertJsonValidationErrors('slug');
+    }
+
+    public function test_signup_rejects_bots_filling_the_honeypot(): void
+    {
+        $this->fakeProvisioning();
+
+        $this->postJson('http://repair.test/api/public/register', $this->signupPayload(['website' => 'http://spam.example']))
+            ->assertJsonValidationErrors('website');
+
+        $this->assertSame(0, Tenant::query()->count());
+    }
+
+    public function test_signup_stops_at_the_daily_limit(): void
+    {
+        config(['tenancy.signup.daily_limit' => 1]);
+        $this->fakeProvisioning();
+        $this->tenant(['source' => 'signup']);
+
+        $this->postJson('http://repair.test/api/public/register', $this->signupPayload())->assertStatus(429);
+    }
+
+    public function test_signup_can_be_switched_off(): void
+    {
+        config(['tenancy.signup.enabled' => false]);
+
+        $this->postJson('http://repair.test/api/public/register', $this->signupPayload())->assertNotFound();
+        $this->get('http://repair.test/')->assertSee('"signup":null', false);
+    }
+
+    public function test_central_page_offers_signup_when_enabled(): void
+    {
+        config(['tenancy.signup.enabled' => true, 'tenancy.signup.trial_days' => 14]);
+
+        $this->get('http://repair.test/')->assertSee('"signup":{"trialDays":14}', false);
     }
 }

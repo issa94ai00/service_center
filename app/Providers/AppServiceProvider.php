@@ -33,6 +33,14 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
             ->by($request->user()?->id ?: $request->ip()));
 
+        // Each sign-up provisions a database and a certificate.
+        RateLimiter::for('signup', fn (Request $request) => [
+            Limit::perHour(3)->by($request->ip()),
+            Limit::perDay(10)->by($request->ip()),
+        ]);
+
+        RateLimiter::for('slug-check', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));
+
         // PDF rendering is CPU-bound, so it gets a tighter budget of its own.
         RateLimiter::for('documents', fn (Request $request) => Limit::perMinute(20)
             ->by($request->user()?->id ?: $request->ip()));

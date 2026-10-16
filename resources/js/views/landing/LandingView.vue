@@ -34,10 +34,17 @@
 
                 <div class="flex items-center gap-2">
                     <router-link
+                        v-if="signup"
                         :to="{ name: 'login' }"
-                        class="hidden rounded-xl bg-gradient-to-l from-cyan-400 to-blue-500 px-5 py-2.5 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.3)] transition hover:brightness-110 focus-ring sm:inline-flex"
+                        class="hidden rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/5 hover:text-white focus-ring sm:inline-flex"
                     >
                         تسجيل الدخول
+                    </router-link>
+                    <router-link
+                        :to="primaryCta.to"
+                        class="hidden rounded-xl bg-gradient-to-l from-cyan-400 to-blue-500 px-5 py-2.5 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.3)] transition hover:brightness-110 focus-ring sm:inline-flex"
+                    >
+                        {{ primaryCta.short }}
                     </router-link>
                     <button
                         type="button"
@@ -67,8 +74,15 @@
                     </a>
                 </nav>
                 <router-link
-                    :to="{ name: 'login' }"
+                    :to="primaryCta.to"
                     class="mt-3 flex w-full items-center justify-center rounded-xl bg-gradient-to-l from-cyan-400 to-blue-500 py-3 font-bold text-slate-950 focus-ring"
+                >
+                    {{ primaryCta.label }}
+                </router-link>
+                <router-link
+                    v-if="signup"
+                    :to="{ name: 'login' }"
+                    class="mt-2 flex w-full items-center justify-center rounded-xl border border-white/15 py-3 font-semibold text-slate-200 focus-ring"
                 >
                     تسجيل الدخول
                 </router-link>
@@ -99,14 +113,21 @@
 
                         <div class="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center lg:justify-start">
                             <router-link
-                                :to="{ name: 'login' }"
+                                :to="primaryCta.to"
                                 class="group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-cyan-400 to-blue-500 px-7 py-4 text-base font-bold text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.35)] transition hover:brightness-110 focus-ring"
                             >
-                                الدخول إلى النظام
+                                {{ primaryCta.label }}
                                 <svg class="h-4 w-4 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </router-link>
+                            <router-link
+                                v-if="signup"
+                                :to="{ name: 'login' }"
+                                class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-ring"
+                            >
+                                لديّ متجر — تسجيل الدخول
+                            </router-link>
                             <a
-                                v-if="contactUrl"
+                                v-else-if="contactUrl"
                                 :href="contactUrl"
                                 target="_blank"
                                 rel="noopener"
@@ -347,17 +368,25 @@
                     <div class="relative overflow-hidden rounded-3xl border border-cyan-400/30 bg-gradient-to-br from-blue-800/60 via-slate-900 to-cyan-900/50 px-6 py-12 text-center shadow-[0_0_80px_rgba(34,211,238,0.15)] sm:px-14 sm:py-16">
                         <h2 class="text-2xl font-black leading-snug text-white sm:text-4xl">جاهز لتبدأ يومك من لوحة واحدة؟</h2>
                         <p class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-slate-300">
-                            سجّل الدخول بحسابك وتابع المبيعات والصيانة والصندوق من أي جهاز.
+                            <template v-if="signup">أنشئ متجرك الآن وجرّب النظام كاملاً مجاناً لمدة {{ signup.trialDays }} يوماً.</template>
+                            <template v-else>سجّل الدخول بحسابك وتابع المبيعات والصيانة والصندوق من أي جهاز.</template>
                         </p>
                         <div class="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
                             <router-link
-                                :to="{ name: 'login' }"
+                                :to="primaryCta.to"
                                 class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-l from-cyan-400 to-blue-500 px-8 py-4 text-base font-bold text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:brightness-110 focus-ring"
+                            >
+                                {{ primaryCta.label }}
+                            </router-link>
+                            <router-link
+                                v-if="signup"
+                                :to="{ name: 'login' }"
+                                class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-ring"
                             >
                                 تسجيل الدخول
                             </router-link>
                             <a
-                                v-if="contactUrl"
+                                v-else-if="contactUrl"
                                 :href="contactUrl"
                                 target="_blank"
                                 rel="noopener"
@@ -385,6 +414,7 @@
 
 <script setup>
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
+import { tenancy } from '../../tenancy';
 
 /**
  * Public-facing details. Fill `whatsapp` (international format, digits only,
@@ -424,7 +454,16 @@ const navLinks = [
     { href: '#faq', label: 'الأسئلة الشائعة' },
 ];
 
-const heroPoints = ['يعمل من المتصفح ويُثبَّت كتطبيق', 'طباعة إيصالات وفواتير', 'صلاحيات لكل موظف'];
+// Self-service sign-up, offered only on the public site (tenancy.signup).
+const signup = tenancy.signup;
+
+const primaryCta = signup
+    ? { to: { name: 'register' }, label: 'أنشئ متجرك مجاناً', short: 'جرّب مجاناً' }
+    : { to: { name: 'login' }, label: 'الدخول إلى النظام', short: 'تسجيل الدخول' };
+
+const heroPoints = signup
+    ? [`تجربة مجانية ${signup.trialDays} يوماً`, 'بدون بطاقة دفع', 'متجرك جاهز خلال دقيقة']
+    : ['يعمل من المتصفح ويُثبَّت كتطبيق', 'طباعة إيصالات وفواتير', 'صلاحيات لكل موظف'];
 
 const modules = [
     { icon: '🧾', label: 'المبيعات' },
@@ -496,6 +535,12 @@ const whyItems = [
 ];
 
 const faqs = [
+    ...(signup
+        ? [{
+            q: 'كيف أبدأ؟ وماذا يحدث بعد الفترة التجريبية؟',
+            a: `أنشئ متجرك من زر "أنشئ متجرك مجاناً" فتحصل على عنوان خاص بمتجرك وقاعدة بيانات مستقلة خلال دقيقة. التجربة مجانية لمدة ${signup.trialDays} يوماً وبكل المزايا، وقبل انتهائها تواصل معنا لتفعيل الاشتراك دون أن تفقد أي بيانات.`,
+        }]
+        : []),
     {
         q: 'هل أحتاج لتثبيت برنامج على الحاسوب؟',
         a: 'لا. يعمل النظام من المتصفح مباشرة، ويمكنك تثبيته على الجوال أو الحاسوب كتطبيق من خيار "التثبيت" في المتصفح.',

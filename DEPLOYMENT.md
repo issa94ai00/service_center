@@ -225,6 +225,15 @@ certificate is served. Logs: `journalctl -u 'repair-tenant-site@*'`.
 `php artisan tenants:certificate <slug>` does the same from the shell, and the
 scheduler retries `--pending` shops hourly if its cron is installed.
 
+**Self-service sign-up** — `repair.damatech.sy/register` lets a visitor create
+their own shop on a free trial (`plan` "تجريبية", `expires_at` = today +
+`TENANCY_SIGNUP_TRIAL_DAYS`, default 14); it closes automatically on expiry until
+an admin extends it. Guards: 3 sign-ups/hour and 10/day per IP, a site-wide
+`TENANCY_SIGNUP_DAILY_LIMIT` (default 20 — each sign-up costs a Let's Encrypt
+certificate, 50/week per domain), one sign-up per email, and a honeypot field.
+`TENANCY_SIGNUP_ENABLED=false` turns it off; the landing page then falls back to
+"sign in". Sign-ups show a "تسجيل ذاتي" badge in the admin panel.
+
 The `.env` keys involved: `TENANCY_*`, `DB_DATABASE`/`DB_CENTRAL_DATABASE`
 (`repair_central`), `SESSION_DOMAIN=null` (cookies stay per host),
 `SESSION_COOKIE`, and `SANCTUM_STATEFUL_DOMAINS` including `*.repair.damatech.sy`.

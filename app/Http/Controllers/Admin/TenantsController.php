@@ -188,6 +188,7 @@ class TenantsController extends Controller
             'host' => $tenant->host(),
             'database' => $tenant->database,
             'status' => $tenant->status,
+            'source' => $tenant->source,
             'is_expired' => $tenant->isExpired(),
             'is_accessible' => $tenant->isAccessible(),
             'plan' => $tenant->plan,

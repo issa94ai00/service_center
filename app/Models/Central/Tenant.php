@@ -15,7 +15,7 @@ class Tenant extends Model
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
-        'slug', 'name', 'database', 'status', 'plan', 'expires_at',
+        'slug', 'name', 'database', 'status', 'source', 'signup_ip', 'plan', 'expires_at',
         'owner_name', 'owner_email', 'contact_phone', 'notes',
         'ssl_status', 'ssl_message',
     ];

@@ -52,7 +52,9 @@
 
             <p class="mt-6 text-center text-sm text-slate-500">
                 لا تملك متجراً بعد؟
-                <router-link :to="{ name: 'landing' }" class="font-semibold text-cyan-300 hover:text-cyan-200">تعرّف على النظام</router-link>
+                <router-link :to="tenancy.signup ? { name: 'register' } : { name: 'landing' }" class="font-semibold text-cyan-300 hover:text-cyan-200">
+                    {{ tenancy.signup ? 'أنشئ متجرك مجاناً' : 'تعرّف على النظام' }}
+                </router-link>
             </p>
         </div>
     </div>

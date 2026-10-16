@@ -15,6 +15,11 @@ export function createCentralRouter() {
                 name: 'login',
                 component: () => import('../views/central/ShopFinderView.vue'),
             },
+            {
+                path: '/register',
+                name: 'register',
+                component: () => import('../views/central/RegisterView.vue'),
+            },
             { path: '/:pathMatch(.*)*', redirect: '/' },
         ],
     });

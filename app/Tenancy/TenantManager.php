@@ -28,7 +28,8 @@ class TenantManager
      * the shop's ssl_status so it can be retried.
      *
      * @param  array{slug: string, name: string, owner_name: string, owner_email: string, owner_password: string,
-     *     plan?: ?string, expires_at?: ?string, contact_phone?: ?string, notes?: ?string, features?: array<string, bool>}  $data
+     *     plan?: ?string, expires_at?: ?string, contact_phone?: ?string, notes?: ?string, features?: array<string, bool>,
+     *     source?: string, signup_ip?: ?string}  $data
      */
     public function create(array $data): Tenant
     {
@@ -40,6 +41,8 @@ class TenantManager
             'name' => $data['name'],
             'database' => Tenancy::databaseFor($slug),
             'status' => Tenant::STATUS_ACTIVE,
+            'source' => $data['source'] ?? 'admin',
+            'signup_ip' => $data['signup_ip'] ?? null,
             'plan' => $data['plan'] ?? null,
             'expires_at' => $data['expires_at'] ?? null,
             'owner_name' => $data['owner_name'],
@@ -271,6 +274,14 @@ class TenantManager
         }
 
         $tenant->delete();
+    }
+
+    /** Whether a new shop could take $slug right now. */
+    public function slugAvailable(string $slug): bool
+    {
+        return Tenancy::isValidSlug($slug)
+            && ! Tenancy::isReservedSlug($slug)
+            && ! Tenant::query()->where('slug', $slug)->exists();
     }
 
     private function assertSlugAvailable(string $slug): void

@@ -47,8 +47,12 @@ class IdentifyTenant
         $context = $context === Tenancy::ADMIN ? Tenancy::ADMIN : Tenancy::CENTRAL;
         $this->tenancy->useCentral($context);
 
-        $adminApi = $request->is('api/admin', 'api/admin/*');
-        if ($request->is('api/*') && ! ($context === Tenancy::ADMIN && $adminApi)) {
+        // Each central host answers only its own API: sign-up on the public
+        // site, tenant management on admin.*.
+        $allowedApi = $context === Tenancy::ADMIN
+            ? $request->is('api/admin', 'api/admin/*')
+            : $request->is('api/public/*');
+        if ($request->is('api/*') && ! $allowedApi) {
             return $this->deny($request, Response::HTTP_NOT_FOUND, 'هذا العنوان لا يخدم واجهة المتجر.');
         }
 
@@ -71,7 +75,7 @@ class IdentifyTenant
             return $this->deny($request, Response::HTTP_PAYMENT_REQUIRED, 'انتهى اشتراك هذا المتجر. يرجى التواصل مع الدعم الفني للتجديد.', $tenant);
         }
 
-        if ($request->is('api/admin', 'api/admin/*')) {
+        if ($request->is('api/admin', 'api/admin/*', 'api/public/*')) {
             return $this->deny($request, Response::HTTP_NOT_FOUND, 'Not found.');
         }
 

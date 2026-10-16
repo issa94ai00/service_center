@@ -10,6 +10,8 @@
 export const tenancy = Object.freeze({
     mode: 'single',
     centralDomain: '',
+    // { trialDays } when the public site offers self-service sign-up.
+    signup: null,
     tenant: null,
     ...(window.__TENANCY__ || {}),
 });

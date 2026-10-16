@@ -30,6 +30,9 @@ use Illuminate\Support\Facades\Route;
 // Platform admin API, answered only on admin.<central domain> (IdentifyTenant).
 Route::prefix('admin')->group(base_path('routes/admin.php'));
 
+// Public-site API (shop sign-up), answered only on the bare central domain.
+Route::prefix('public')->group(base_path('routes/public.php'));
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
