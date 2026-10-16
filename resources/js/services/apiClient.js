@@ -14,7 +14,10 @@ const api = axios.create({
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        // A 401 on the "who am I" probe just means a guest is browsing (e.g. the
+        // public home page); the router guard decides whether they need to sign in.
+        const isSessionProbe = error.config?.url === '/user';
+        if (error.response?.status === 401 && !isSessionProbe) {
             const inLogin = window.location.pathname === '/login';
             if (!inLogin) {
                 window.location.href = '/login';

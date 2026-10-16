@@ -284,7 +284,13 @@
                     />
                     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
                         <div v-for="w in whyItems" :key="w.title" class="rounded-3xl border border-white/10 bg-slate-900/50 p-6">
-                            <div class="text-3xl" aria-hidden="true">{{ w.icon }}</div>
+                            <svg v-if="w.flag" class="h-8 w-12 rounded-[3px] shadow ring-1 ring-white/15" viewBox="0 0 900 600" role="img" aria-label="علم سوريا">
+                                <rect width="900" height="200" fill="#007A3D" />
+                                <rect y="200" width="900" height="200" fill="#FFFFFF" />
+                                <rect y="400" width="900" height="200" fill="#000000" />
+                                <path fill="#CE1126" d="M225.0,238.0 L238.9,280.8 L284.0,280.8 L247.5,307.3 L261.4,350.2 L225.0,323.7 L188.6,350.2 L202.5,307.3 L166.0,280.8 L211.1,280.8Z M450.0,238.0 L463.9,280.8 L509.0,280.8 L472.5,307.3 L486.4,350.2 L450.0,323.7 L413.6,350.2 L427.5,307.3 L391.0,280.8 L436.1,280.8Z M675.0,238.0 L688.9,280.8 L734.0,280.8 L697.5,307.3 L711.4,350.2 L675.0,323.7 L638.6,350.2 L652.5,307.3 L616.0,280.8 L661.1,280.8Z" />
+                            </svg>
+                            <div v-else class="text-3xl" aria-hidden="true">{{ w.icon }}</div>
                             <h3 class="mt-4 text-lg font-bold text-white">{{ w.title }}</h3>
                             <p class="mt-2 text-sm leading-relaxed text-slate-400">{{ w.text }}</p>
                         </div>
@@ -486,7 +492,7 @@ const whyItems = [
     { icon: '⚡', title: 'سريع على الكاونتر', text: 'واجهة مختصرة تقلل النقرات في أكثر العمليات تكراراً.' },
     { icon: '📱', title: 'على أي جهاز', text: 'يعمل على الحاسوب والتابلت والجوال، ويمكن تثبيته كتطبيق.' },
     { icon: '🖨️', title: 'طباعة مرنة', text: 'إعدادات طباعة لكل جهاز، من الطابعة الحرارية إلى A4.' },
-    { icon: '🇸🇾', title: 'عربي بالكامل', text: 'مصمم بالعربية من اليوم الأول، مع دعم فني محلي.' },
+    { flag: true, title: 'عربي بالكامل', text: 'مصمم بالعربية من اليوم الأول، مع دعم فني محلي.' },
 ];
 
 const faqs = [

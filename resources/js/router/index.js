@@ -230,11 +230,6 @@ router.beforeEach(async (to) => {
         return { name: 'dashboard' };
     }
 
-    // The installed app opens at "/"; staff there want the sign-in form, not the marketing page.
-    if (to.name === 'landing' && window.matchMedia?.('(display-mode: standalone)').matches) {
-        return { name: 'login' };
-    }
-
     if (!features.loaded && auth.isAuthenticated) {
         await features.fetchFeatures();
     }
