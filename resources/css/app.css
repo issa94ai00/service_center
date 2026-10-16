@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* enable the `dark:` variant, driven by a class on <html> (the navbar switch) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
@@ -10,11 +13,20 @@
     --font-sans: 'Segoe UI', 'Tahoma', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
     --font-arabic: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+    /* Public marketing pages; the font only downloads where this class is used. */
+    --font-display: 'IBM Plex Sans Arabic', 'Segoe UI', 'Tahoma', ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
     html {
+        color-scheme: light;
+    }
+    /* RTL by default, but let the English public pages switch with dir="ltr". */
+    html:not([dir='ltr']) {
         direction: rtl;
+    }
+    html.dark {
+        color-scheme: dark;
     }
     body {
         font-family: var(--font-sans);
@@ -23,6 +35,11 @@
 }
 /* Phones and tablets */
 @layer base {
+    /* Fieldsets default to min-width: min-content, so a wide field pushes them past narrow screens. */
+    fieldset {
+        min-width: 0;
+    }
+
     /* iOS Safari zooms the page when a field under 16px is focused. */
     @media (max-width: 639px) and (pointer: coarse) {
         input:not([type='checkbox']):not([type='radio']):not([type='range']),
@@ -37,4 +54,212 @@
     .overflow-x-auto > table > thead th {
         white-space: nowrap;
     }
+
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+}
+
+/* ---- Dark theme (screen only; printing keeps the light palette) -------- */
+@media screen {
+    /* The page itself, then neutral surfaces/text/borders (light slate -> dark slate) */
+    .dark body {
+        background-color: #020617;
+        color: #f1f5f9;
+    }
+    .dark .bg-slate-100 { background-color: #1e293b; }
+    .dark .bg-slate-100\/80 { background-color: color-mix(in srgb, #1e293b 80%, transparent); }
+    .dark .bg-slate-200 { background-color: #334155; }
+    .dark .bg-slate-200\/70 { background-color: color-mix(in srgb, #334155 70%, transparent); }
+    .dark .bg-slate-200\/80 { background-color: color-mix(in srgb, #334155 80%, transparent); }
+    .dark .bg-slate-300 { background-color: #475569; }
+    .dark .bg-slate-50 { background-color: #020617; }
+    .dark .bg-slate-50\/40 { background-color: color-mix(in srgb, #1e293b 40%, transparent); }
+    .dark .bg-slate-50\/50 { background-color: color-mix(in srgb, #1e293b 50%, transparent); }
+    .dark .bg-slate-50\/60 { background-color: color-mix(in srgb, #1e293b 60%, transparent); }
+    .dark .bg-slate-50\/70 { background-color: color-mix(in srgb, #1e293b 70%, transparent); }
+    .dark .bg-white { background-color: #0f172a; }
+    .dark .bg-white\/80 { background-color: color-mix(in srgb, #0f172a 80%, transparent); }
+    .dark .bg-white\/95 { background-color: color-mix(in srgb, #0f172a 95%, transparent); }
+    .dark .border-slate-100 { border-color: #1e293b; }
+    .dark .border-slate-200 { border-color: #334155; }
+    .dark .border-slate-200\/80 { border-color: color-mix(in srgb, #334155 80%, transparent); }
+    .dark .border-slate-200\/90 { border-color: color-mix(in srgb, #334155 90%, transparent); }
+    .dark .border-slate-300 { border-color: #475569; }
+    .dark .divide-slate-100 > :not(:last-child) { border-color: #1e293b; }
+    .dark .from-slate-100 { --tw-gradient-from: #1e293b; }
+    .dark .ring-slate-100 { --tw-ring-color: #1e293b; }
+    .dark .ring-slate-200 { --tw-ring-color: #334155; }
+    .dark .ring-slate-300 { --tw-ring-color: #475569; }
+    .dark .text-slate-500 { color: #94a3b8; }
+    .dark .text-slate-600 { color: #94a3b8; }
+    .dark .text-slate-700 { color: #cbd5e1; }
+    .dark .text-slate-800 { color: #e2e8f0; }
+    .dark .text-slate-900 { color: #f1f5f9; }
+    .dark .to-slate-200 { --tw-gradient-to: #334155; }
+    .dark .via-white { --tw-gradient-via: #0f172a; }
+
+    /* Colored alert/callout/badge tints (light tint -> dark tint, dark label -> light label) */
+    .dark .bg-amber-100 { background-color: #78350f; }
+    .dark .bg-amber-50 { background-color: #451a03; }
+    .dark .bg-amber-50\/40 { background-color: color-mix(in srgb, #451a03 40%, transparent); }
+    .dark .bg-amber-50\/60 { background-color: color-mix(in srgb, #451a03 60%, transparent); }
+    .dark .bg-amber-50\/70 { background-color: color-mix(in srgb, #451a03 70%, transparent); }
+    .dark .bg-blue-100 { background-color: #1e3a8a; }
+    .dark .bg-blue-50 { background-color: #172554; }
+    .dark .bg-blue-50\/30 { background-color: color-mix(in srgb, #172554 30%, transparent); }
+    .dark .bg-blue-50\/40 { background-color: color-mix(in srgb, #172554 40%, transparent); }
+    .dark .bg-blue-50\/50 { background-color: color-mix(in srgb, #172554 50%, transparent); }
+    .dark .bg-blue-50\/60 { background-color: color-mix(in srgb, #172554 60%, transparent); }
+    .dark .bg-cyan-100 { background-color: #164e63; }
+    .dark .bg-cyan-50 { background-color: #083344; }
+    .dark .bg-emerald-100 { background-color: #064e3b; }
+    .dark .bg-emerald-200 { background-color: #065f46; }
+    .dark .bg-emerald-50 { background-color: #022c22; }
+    .dark .bg-emerald-50\/30 { background-color: color-mix(in srgb, #022c22 30%, transparent); }
+    .dark .bg-emerald-50\/50 { background-color: color-mix(in srgb, #022c22 50%, transparent); }
+    .dark .bg-emerald-50\/70 { background-color: color-mix(in srgb, #022c22 70%, transparent); }
+    .dark .bg-indigo-100 { background-color: #312e81; }
+    .dark .bg-indigo-50 { background-color: #1e1b4b; }
+    .dark .bg-indigo-50\/50 { background-color: color-mix(in srgb, #1e1b4b 50%, transparent); }
+    .dark .bg-orange-100 { background-color: #7c2d12; }
+    .dark .bg-orange-50 { background-color: #431407; }
+    .dark .bg-purple-50 { background-color: #3b0764; }
+    .dark .bg-red-100 { background-color: #7f1d1d; }
+    .dark .bg-red-50 { background-color: #450a0a; }
+    .dark .bg-red-50\/40 { background-color: color-mix(in srgb, #450a0a 40%, transparent); }
+    .dark .bg-red-50\/50 { background-color: color-mix(in srgb, #450a0a 50%, transparent); }
+    .dark .bg-rose-100 { background-color: #881337; }
+    .dark .bg-rose-200 { background-color: #9f1239; }
+    .dark .bg-rose-50 { background-color: #4c0519; }
+    .dark .bg-rose-50\/20 { background-color: color-mix(in srgb, #4c0519 20%, transparent); }
+    .dark .bg-rose-50\/30 { background-color: color-mix(in srgb, #4c0519 30%, transparent); }
+    .dark .bg-rose-50\/70 { background-color: color-mix(in srgb, #4c0519 70%, transparent); }
+    .dark .bg-sky-100 { background-color: #0c4a6e; }
+    .dark .bg-violet-100 { background-color: #4c1d95; }
+    .dark .bg-violet-50 { background-color: #2e1065; }
+    .dark .border-amber-200 { border-color: #92400e; }
+    .dark .border-amber-300 { border-color: #b45309; }
+    .dark .border-blue-100 { border-color: #1e40af; }
+    .dark .border-blue-200 { border-color: #1e40af; }
+    .dark .border-blue-300 { border-color: #1d4ed8; }
+    .dark .border-emerald-100 { border-color: #065f46; }
+    .dark .border-emerald-200 { border-color: #065f46; }
+    .dark .border-emerald-300 { border-color: #047857; }
+    .dark .border-indigo-300 { border-color: #4338ca; }
+    .dark .border-purple-100 { border-color: #6b21a8; }
+    .dark .border-purple-200 { border-color: #6b21a8; }
+    .dark .border-red-100 { border-color: #991b1b; }
+    .dark .border-red-200 { border-color: #991b1b; }
+    .dark .border-red-300 { border-color: #b91c1c; }
+    .dark .border-rose-200 { border-color: #9f1239; }
+    .dark .border-rose-300 { border-color: #be123c; }
+    .dark .from-emerald-50 { --tw-gradient-from: #022c22; }
+    .dark .from-rose-50 { --tw-gradient-from: #4c0519; }
+    .dark .ring-amber-100 { --tw-ring-color: #92400e; }
+    .dark .ring-amber-200 { --tw-ring-color: #92400e; }
+    .dark .ring-amber-300 { --tw-ring-color: #b45309; }
+    .dark .ring-amber-300\/40 { --tw-ring-color: color-mix(in srgb, #b45309 40%, transparent); }
+    .dark .ring-blue-100 { --tw-ring-color: #1e40af; }
+    .dark .ring-blue-200 { --tw-ring-color: #1e40af; }
+    .dark .ring-blue-200\/50 { --tw-ring-color: color-mix(in srgb, #1e40af 50%, transparent); }
+    .dark .ring-blue-300 { --tw-ring-color: #1d4ed8; }
+    .dark .ring-cyan-200 { --tw-ring-color: #155e75; }
+    .dark .ring-emerald-200 { --tw-ring-color: #065f46; }
+    .dark .ring-orange-200 { --tw-ring-color: #9a3412; }
+    .dark .ring-orange-300 { --tw-ring-color: #c2410c; }
+    .dark .ring-red-200 { --tw-ring-color: #991b1b; }
+    .dark .ring-rose-200 { --tw-ring-color: #9f1239; }
+    .dark .ring-violet-200 { --tw-ring-color: #5b21b6; }
+    .dark .text-amber-700 { color: #fcd34d; }
+    .dark .text-amber-800 { color: #fcd34d; }
+    .dark .text-amber-900 { color: #fcd34d; }
+    .dark .text-blue-700 { color: #93c5fd; }
+    .dark .text-blue-700\/80 { color: color-mix(in srgb, #93c5fd 80%, transparent); }
+    .dark .text-blue-800 { color: #93c5fd; }
+    .dark .text-blue-900 { color: #93c5fd; }
+    .dark .text-cyan-700 { color: #67e8f9; }
+    .dark .text-cyan-800 { color: #67e8f9; }
+    .dark .text-emerald-700 { color: #6ee7b7; }
+    .dark .text-emerald-700\/80 { color: color-mix(in srgb, #6ee7b7 80%, transparent); }
+    .dark .text-emerald-800 { color: #6ee7b7; }
+    .dark .text-emerald-900 { color: #6ee7b7; }
+    .dark .text-emerald-950 { color: #6ee7b7; }
+    .dark .text-indigo-700 { color: #a5b4fc; }
+    .dark .text-indigo-950 { color: #a5b4fc; }
+    .dark .text-lime-700 { color: #bef264; }
+    .dark .text-orange-700 { color: #fdba74; }
+    .dark .text-orange-800 { color: #fdba74; }
+    .dark .text-purple-700 { color: #d8b4fe; }
+    .dark .text-red-700 { color: #fca5a5; }
+    .dark .text-red-800 { color: #fca5a5; }
+    .dark .text-rose-700 { color: #fda4af; }
+    .dark .text-rose-800 { color: #fda4af; }
+    .dark .text-rose-900 { color: #fda4af; }
+    .dark .text-rose-950 { color: #fda4af; }
+    .dark .text-sky-700 { color: #7dd3fc; }
+    .dark .text-violet-700 { color: #c4b5fd; }
+    .dark .text-violet-800 { color: #c4b5fd; }
+    .dark .to-red-50 { --tw-gradient-to: #450a0a; }
+    .dark .to-teal-50 { --tw-gradient-to: #042f2e; }
+
+    /* Same mapping for hover/focus/disabled/placeholder states */
+    .dark .disabled\:bg-slate-100:disabled { background-color: #1e293b; }
+    .dark .disabled\:bg-slate-50:disabled { background-color: #020617; }
+    .dark .disabled\:hover\:bg-slate-50\/70:disabled:hover { background-color: color-mix(in srgb, #1e293b 70%, transparent); }
+    .dark .disabled\:hover\:border-slate-100:disabled:hover { border-color: #1e293b; }
+    .dark .disabled\:text-slate-500:disabled { color: #94a3b8; }
+    .dark .focus-visible\:ring-blue-300:focus-visible { --tw-ring-color: #1d4ed8; }
+    .dark .focus-visible\:ring-cyan-300:focus-visible { --tw-ring-color: #0e7490; }
+    .dark .focus-within\:ring-blue-200:focus-within { --tw-ring-color: #1e40af; }
+    .dark .focus\:bg-slate-50:focus { background-color: #020617; }
+    .dark .focus\:bg-white:focus { background-color: #0f172a; }
+    .dark .focus\:ring-amber-100:focus { --tw-ring-color: #92400e; }
+    .dark .focus\:ring-blue-100:focus { --tw-ring-color: #1e40af; }
+    .dark .focus\:ring-blue-300:focus { --tw-ring-color: #1d4ed8; }
+    .dark .focus\:ring-red-100:focus { --tw-ring-color: #991b1b; }
+    .dark .focus\:ring-rose-200:focus { --tw-ring-color: #9f1239; }
+    .dark .focus\:ring-rose-300:focus { --tw-ring-color: #be123c; }
+    .dark .hover\:bg-amber-100:hover { background-color: #78350f; }
+    .dark .hover\:bg-blue-100:hover { background-color: #1e3a8a; }
+    .dark .hover\:bg-blue-50:hover { background-color: #172554; }
+    .dark .hover\:bg-blue-50\/40:hover { background-color: color-mix(in srgb, #172554 40%, transparent); }
+    .dark .hover\:bg-emerald-100:hover { background-color: #064e3b; }
+    .dark .hover\:bg-emerald-200:hover { background-color: #065f46; }
+    .dark .hover\:bg-emerald-50:hover { background-color: #022c22; }
+    .dark .hover\:bg-indigo-100:hover { background-color: #312e81; }
+    .dark .hover\:bg-indigo-50\/40:hover { background-color: color-mix(in srgb, #1e1b4b 40%, transparent); }
+    .dark .hover\:bg-red-100:hover { background-color: #7f1d1d; }
+    .dark .hover\:bg-red-50:hover { background-color: #450a0a; }
+    .dark .hover\:bg-rose-100:hover { background-color: #881337; }
+    .dark .hover\:bg-rose-50:hover { background-color: #4c0519; }
+    .dark .hover\:bg-slate-100:hover { background-color: #1e293b; }
+    .dark .hover\:bg-slate-200:hover { background-color: #334155; }
+    .dark .hover\:bg-slate-50:hover { background-color: #020617; }
+    .dark .hover\:bg-slate-50\/50:hover { background-color: color-mix(in srgb, #1e293b 50%, transparent); }
+    .dark .hover\:bg-slate-50\/70:hover { background-color: color-mix(in srgb, #1e293b 70%, transparent); }
+    .dark .hover\:bg-slate-50\/80:hover { background-color: color-mix(in srgb, #1e293b 80%, transparent); }
+    .dark .hover\:bg-white:hover { background-color: #0f172a; }
+    .dark .hover\:border-blue-200:hover { border-color: #1e40af; }
+    .dark .hover\:border-blue-300:hover { border-color: #1d4ed8; }
+    .dark .hover\:border-indigo-200:hover { border-color: #3730a3; }
+    .dark .hover\:border-slate-300:hover { border-color: #475569; }
+    .dark .hover\:text-amber-700:hover { color: #fcd34d; }
+    .dark .hover\:text-blue-700:hover { color: #93c5fd; }
+    .dark .hover\:text-blue-800:hover { color: #93c5fd; }
+    .dark .hover\:text-blue-900:hover { color: #93c5fd; }
+    .dark .hover\:text-emerald-800:hover { color: #6ee7b7; }
+    .dark .hover\:text-orange-800:hover { color: #fdba74; }
+    .dark .hover\:text-red-700:hover { color: #fca5a5; }
+    .dark .hover\:text-rose-700:hover { color: #fda4af; }
+    .dark .hover\:text-slate-600:hover { color: #94a3b8; }
+    .dark .hover\:text-slate-700:hover { color: #cbd5e1; }
+    .dark .hover\:text-slate-800:hover { color: #e2e8f0; }
+    .dark .hover\:text-slate-900:hover { color: #f1f5f9; }
+    .dark .hover\:text-violet-800:hover { color: #c4b5fd; }
+    .dark .placeholder\:text-slate-600::placeholder { color: #94a3b8; }
 }

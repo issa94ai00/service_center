@@ -1,582 +1,606 @@
 <template>
-    <div class="landing min-h-screen overflow-x-hidden bg-[#070B17] font-sans text-slate-100 selection:bg-cyan-400 selection:text-slate-950">
-        <!-- Ambient background -->
-        <div class="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
-            <div class="absolute -top-48 inset-x-0 mx-auto h-[520px] w-[min(900px,100%)] rounded-full bg-gradient-to-tr from-blue-700/25 via-cyan-500/10 to-transparent blur-[130px]" />
-            <div class="absolute top-[45%] -end-40 h-[520px] w-[520px] rounded-full bg-cyan-500/10 blur-[150px]" />
-            <div class="absolute top-[75%] -start-40 h-[520px] w-[520px] rounded-full bg-blue-600/10 blur-[150px]" />
-        </div>
-
+    <div class="landing min-h-screen overflow-x-clip bg-white font-display text-slate-700 antialiased selection:bg-cyan-500 selection:text-white dark:bg-[#070B17] dark:text-slate-300">
         <!-- Header -->
         <header
-            class="sticky top-0 z-50 border-b transition-colors duration-300"
-            :class="scrolled || menuOpen ? 'border-white/10 bg-[#070B17]/85 backdrop-blur-xl' : 'border-transparent bg-transparent'"
+            class="sticky top-0 z-50 transition-[background-color,border-color,box-shadow] duration-300"
+            :class="scrolled || menuOpen
+                ? 'border-b border-slate-200/70 bg-white/80 shadow-[0_1px_24px_-12px_rgba(15,23,42,0.25)] backdrop-blur-xl dark:border-white/10 dark:bg-[#070B17]/80'
+                : 'border-b border-transparent'"
         >
-            <div class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:h-20 sm:px-6 lg:px-8">
-                <a href="#top" class="flex items-center gap-3 rounded-xl focus-ring" @click="menuOpen = false">
-                    <img :src="LOGO" alt="" class="h-10 w-10 rounded-xl ring-1 ring-white/15 shadow-lg shadow-blue-500/20" />
-                    <span class="leading-tight">
-                        <span class="block text-sm font-extrabold text-white sm:text-base">{{ BRAND.name }}</span>
-                        <span class="block text-[11px] text-cyan-200/70">{{ BRAND.company }}</span>
-                    </span>
+            <div class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-8">
+                <a href="#top" class="flex min-w-0 items-center gap-2.5 rounded-xl focus-ring" @click="menuOpen = false">
+                    <img :src="LOGO" alt="" class="h-9 w-9 shrink-0 rounded-xl shadow-sm ring-1 ring-slate-900/10 dark:ring-white/15" />
+                    <span class="truncate text-[15px] font-bold text-slate-950 dark:text-white">{{ t.brand.name }}</span>
                 </a>
 
-                <nav class="hidden items-center gap-1 text-sm font-medium text-slate-300 lg:flex" aria-label="أقسام الصفحة">
+                <nav
+                    class="hidden items-center gap-0.5 rounded-full border border-slate-200/80 bg-white/70 p-1 text-sm font-medium shadow-xs backdrop-blur lg:flex dark:border-white/10 dark:bg-white/5"
+                    :aria-label="t.nav.features"
+                >
                     <a
                         v-for="link in navLinks"
-                        :key="link.href"
-                        :href="link.href"
-                        class="rounded-lg px-3 py-2 transition-colors hover:bg-white/5 hover:text-white focus-ring"
+                        :key="link.id"
+                        :href="`#${link.id}`"
+                        class="rounded-full px-4 py-1.5 transition-colors focus-ring"
+                        :class="activeSection === link.id
+                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                            : 'text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white'"
+                        @click="onLinkClick(link.id)"
                     >
                         {{ link.label }}
                     </a>
                 </nav>
 
-                <div class="flex items-center gap-2">
+                <div class="flex shrink-0 items-center gap-1.5">
+                    <button
+                        type="button"
+                        :class="iconBtn"
+                        class="sm:w-auto sm:gap-1.5 sm:px-3"
+                        :title="t.switchLangLabel"
+                        :aria-label="t.switchLangLabel"
+                        @click="toggleLocale"
+                    >
+                        <AppIcon name="globe" class="text-[17px]" />
+                        <span class="hidden text-sm font-semibold sm:inline">{{ t.otherLangName }}</span>
+                    </button>
+                    <button
+                        type="button"
+                        :class="iconBtn"
+                        class="max-sm:hidden"
+                        :title="isDark ? t.theme.toLight : t.theme.toDark"
+                        :aria-label="isDark ? t.theme.toLight : t.theme.toDark"
+                        :aria-pressed="isDark"
+                        @click="toggleTheme"
+                    >
+                        <AppIcon :name="isDark ? 'sun' : 'moon'" class="text-[17px]" />
+                    </button>
                     <router-link
                         v-if="signup"
                         :to="{ name: 'login' }"
-                        class="hidden rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/5 hover:text-white focus-ring sm:inline-flex"
+                        class="hidden rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:text-slate-950 focus-ring md:inline-flex dark:text-slate-200 dark:hover:text-white"
                     >
-                        تسجيل الدخول
+                        {{ t.nav.login }}
                     </router-link>
-                    <router-link
-                        :to="primaryCta.to"
-                        class="hidden rounded-xl bg-gradient-to-l from-cyan-400 to-blue-500 px-5 py-2.5 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.3)] transition hover:brightness-110 focus-ring sm:inline-flex"
-                    >
+                    <router-link :to="primaryCta.to" :class="btnPrimary" class="px-4 py-2 text-sm max-sm:hidden">
                         {{ primaryCta.short }}
                     </router-link>
                     <button
                         type="button"
-                        class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-200 hover:bg-white/5 focus-ring lg:hidden"
+                        :class="iconBtn"
+                        class="lg:hidden"
                         :aria-expanded="menuOpen"
                         aria-controls="mobile-menu"
-                        :aria-label="menuOpen ? 'إغلاق القائمة' : 'فتح القائمة'"
+                        :aria-label="menuOpen ? t.nav.closeMenu : t.nav.openMenu"
                         @click="menuOpen = !menuOpen"
                     >
-                        <svg v-if="!menuOpen" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
-                        <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" /></svg>
+                        <AppIcon :name="menuOpen ? 'close' : 'menu'" class="text-[18px]" />
                     </button>
                 </div>
             </div>
 
             <!-- Mobile menu -->
-            <div v-show="menuOpen" id="mobile-menu" class="border-t border-white/10 px-4 pb-5 pt-3 lg:hidden">
-                <nav class="flex flex-col gap-1 text-base font-medium text-slate-200" aria-label="أقسام الصفحة">
-                    <a
-                        v-for="link in navLinks"
-                        :key="link.href"
-                        :href="link.href"
-                        class="rounded-xl px-3 py-3 hover:bg-white/5 focus-ring"
-                        @click="menuOpen = false"
-                    >
-                        {{ link.label }}
-                    </a>
-                </nav>
-                <router-link
-                    :to="primaryCta.to"
-                    class="mt-3 flex w-full items-center justify-center rounded-xl bg-gradient-to-l from-cyan-400 to-blue-500 py-3 font-bold text-slate-950 focus-ring"
+            <Transition name="drop">
+                <div
+                    v-show="menuOpen"
+                    id="mobile-menu"
+                    class="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-slate-200/70 px-4 pb-6 pt-2 lg:hidden dark:border-white/10"
                 >
-                    {{ primaryCta.label }}
-                </router-link>
-                <router-link
-                    v-if="signup"
-                    :to="{ name: 'login' }"
-                    class="mt-2 flex w-full items-center justify-center rounded-xl border border-white/15 py-3 font-semibold text-slate-200 focus-ring"
-                >
-                    تسجيل الدخول
-                </router-link>
-            </div>
+                    <nav class="grid gap-0.5 text-base font-medium text-slate-800 dark:text-slate-100">
+                        <a
+                            v-for="link in navLinks"
+                            :key="link.id"
+                            :href="`#${link.id}`"
+                            class="flex items-center justify-between rounded-xl px-3 py-3 transition hover:bg-slate-100 focus-ring dark:hover:bg-white/5"
+                            @click="onLinkClick(link.id)"
+                        >
+                            {{ link.label }}
+                            <AppIcon name="arrow-right" class="text-slate-400 rtl:rotate-180" />
+                        </a>
+                        <button
+                            type="button"
+                            class="flex items-center justify-between rounded-xl px-3 py-3 text-start transition hover:bg-slate-100 focus-ring sm:hidden dark:hover:bg-white/5"
+                            :aria-pressed="isDark"
+                            @click="toggleTheme"
+                        >
+                            {{ isDark ? t.theme.toLight : t.theme.toDark }}
+                            <AppIcon :name="isDark ? 'sun' : 'moon'" class="text-slate-400" />
+                        </button>
+                    </nav>
+                    <div class="mt-3 grid gap-2 border-t border-slate-200/70 pt-4 dark:border-white/10">
+                        <router-link :to="primaryCta.to" :class="btnPrimary" class="py-3" @click="menuOpen = false">
+                            {{ primaryCta.label }}
+                        </router-link>
+                        <router-link v-if="signup" :to="{ name: 'login' }" :class="btnGhost" class="py-3" @click="menuOpen = false">
+                            {{ t.nav.login }}
+                        </router-link>
+                    </div>
+                </div>
+            </Transition>
         </header>
 
-        <main id="top" class="relative z-10">
+        <main id="top">
             <!-- Hero -->
-            <section class="pb-20 pt-10 sm:pt-16 lg:pb-28 lg:pt-20">
-                <div class="mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 px-4 sm:px-6 lg:grid-cols-12 lg:gap-10 lg:px-8">
-                    <div class="space-y-7 text-center lg:col-span-7 lg:text-start">
-                        <span class="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3.5 py-1.5 text-xs font-semibold text-cyan-200">
-                            <span class="h-1.5 w-1.5 rounded-full bg-cyan-300" aria-hidden="true" />
-                            نظام متكامل لمحلات الهواتف ومراكز الصيانة
+            <section class="relative isolate overflow-hidden pb-20 pt-12 sm:pt-20 lg:pb-28">
+                <div class="hero-grid pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
+                <div
+                    class="pointer-events-none absolute left-1/2 top-0 -z-10 h-[560px] w-[min(1100px,140%)] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(34,211,238,0.28),rgba(37,99,235,0.14),transparent)] blur-2xl dark:bg-[radial-gradient(closest-side,rgba(34,211,238,0.18),rgba(37,99,235,0.12),transparent)]"
+                    aria-hidden="true"
+                />
+
+                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div class="enter mx-auto max-w-3xl text-center">
+                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 py-1 pe-3.5 ps-1 text-xs font-semibold text-slate-700 shadow-xs backdrop-blur sm:text-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                            <span class="rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-2.5 py-0.5 text-[11px] font-bold text-white sm:text-xs">
+                                <AppIcon name="sparkles" class="inline align-[-2px]" />
+                            </span>
+                            {{ t.hero.badge }}
                         </span>
 
-                        <h1 class="text-[2.1rem] font-black leading-[1.25] tracking-tight text-white sm:text-5xl lg:text-[3.6rem]">
-                            أدِر محلّك كاملاً
-                            <span class="block bg-gradient-to-l from-cyan-300 via-sky-400 to-blue-500 bg-clip-text text-transparent">
-                                من الكاونتر حتى التقارير
+                        <h1 class="mt-7 text-balance text-[2.5rem] font-bold leading-[1.15] tracking-tight text-slate-950 sm:text-6xl lg:text-7xl dark:text-white">
+                            {{ t.hero.titlePrefix }}
+                            <span class="mt-1 block bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 bg-clip-text pb-2 text-transparent">
+                                {{ t.hero.titleHighlight }}
                             </span>
                         </h1>
 
-                        <p class="mx-auto max-w-2xl text-base leading-relaxed text-slate-300 sm:text-lg lg:mx-0">
-                            المبيعات والمشتريات، استلام أجهزة الصيانة وتتبّعها، المخزون والصندوق وحسابات الخبراء —
-                            في واجهة عربية واحدة سريعة تعمل على الحاسوب والجوال.
+                        <p class="mx-auto mt-6 max-w-2xl text-pretty text-base leading-8 text-slate-600 sm:text-lg dark:text-slate-400">
+                            {{ t.hero.description }}
                         </p>
 
-                        <div class="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center lg:justify-start">
-                            <router-link
-                                :to="primaryCta.to"
-                                class="group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-cyan-400 to-blue-500 px-7 py-4 text-base font-bold text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.35)] transition hover:brightness-110 focus-ring"
-                            >
+                        <div class="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+                            <router-link :to="primaryCta.to" :class="btnPrimary" class="group gap-2 px-7 py-3.5 text-base">
                                 {{ primaryCta.label }}
-                                <svg class="h-4 w-4 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                                <AppIcon name="arrow-right" class="transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
                             </router-link>
-                            <router-link
-                                v-if="signup"
-                                :to="{ name: 'login' }"
-                                class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-ring"
-                            >
-                                لديّ متجر — تسجيل الدخول
+                            <router-link v-if="signup" :to="{ name: 'login' }" :class="btnGhost" class="px-7 py-3.5 text-base">
+                                {{ t.hero.ctaHaveShop }}
                             </router-link>
-                            <a
-                                v-else-if="contactUrl"
-                                :href="contactUrl"
-                                target="_blank"
-                                rel="noopener"
-                                class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-ring"
-                            >
-                                اطلب نسخة لمحلّك
-                            </a>
-                            <a
-                                v-else
-                                href="#features"
-                                class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-ring"
-                            >
-                                استعرض المزايا
+                            <a v-else href="#features" :class="btnGhost" class="px-7 py-3.5 text-base">
+                                {{ t.hero.ctaExplore }}
                             </a>
                         </div>
 
-                        <ul class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-400 lg:justify-start">
-                            <li v-for="item in heroPoints" :key="item" class="flex items-center gap-2">
-                                <svg class="h-4 w-4 text-emerald-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.58l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                        <ul class="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
+                            <li v-for="item in heroPoints" :key="item" class="flex items-center gap-1.5">
+                                <span class="grid h-4.5 w-4.5 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                                    <AppIcon name="check" :stroke-width="3" class="text-[11px]" />
+                                </span>
                                 {{ item }}
                             </li>
                         </ul>
                     </div>
 
-                    <!-- Live repair-ticket mockup -->
-                    <div class="relative mx-auto w-full max-w-md lg:col-span-5 lg:max-w-none">
-                        <div class="absolute -inset-4 rounded-[2rem] bg-gradient-to-tr from-cyan-500/20 to-blue-600/20 blur-2xl" aria-hidden="true" />
-                        <div class="relative rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.6)] backdrop-blur-xl sm:p-6">
-                            <div class="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
-                                <div class="flex items-center gap-2" aria-hidden="true">
-                                    <span class="h-3 w-3 rounded-full bg-rose-500/80" />
-                                    <span class="h-3 w-3 rounded-full bg-amber-400/80" />
-                                    <span class="h-3 w-3 rounded-full bg-emerald-500/80" />
+                    <!-- Product preview: a repair board where ticket #1042 moves through the stages -->
+                    <div class="enter enter-delay relative mx-auto mt-16 max-w-5xl sm:mt-20">
+                        <div class="absolute -inset-x-6 -inset-y-4 -z-10 rounded-[2.5rem] bg-gradient-to-b from-cyan-400/25 via-blue-500/10 to-transparent blur-2xl dark:from-cyan-500/15" aria-hidden="true" />
+
+                        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/5 sm:rounded-3xl dark:border-white/10 dark:bg-slate-900 dark:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] dark:ring-white/5">
+                            <!-- Window chrome -->
+                            <div class="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/10 dark:bg-slate-950/60">
+                                <div class="flex gap-1.5" dir="ltr" aria-hidden="true">
+                                    <span class="h-2.5 w-2.5 rounded-full bg-rose-400" />
+                                    <span class="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                                 </div>
-                                <span class="font-mono text-xs text-slate-400" dir="ltr">repair.damatech.sy</span>
+                                <div class="mx-auto flex items-center gap-1.5 rounded-md bg-white px-3 py-1 font-mono text-[11px] text-slate-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-white/10" dir="ltr">
+                                    <AppIcon name="shield" class="text-emerald-500" />
+                                    {{ t.mockup.windowUrl }}
+                                </div>
+                                <span class="w-10" aria-hidden="true" />
                             </div>
 
-                            <div class="space-y-4">
-                                <div class="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
-                                    <div class="mb-3 flex items-center justify-between gap-2">
-                                        <span class="font-mono text-sm font-bold text-cyan-300">#1042</span>
-                                        <Transition name="fade" mode="out-in">
-                                            <span
-                                                :key="activeStep"
-                                                class="rounded-full border px-2.5 py-0.5 text-xs font-semibold"
-                                                :class="demoSteps[activeStep].badge"
-                                            >
-                                                {{ demoSteps[activeStep].label }}
-                                            </span>
-                                        </Transition>
-                                    </div>
-
-                                    <p class="text-base font-bold text-white">iPhone 13 Pro — أزرق</p>
-                                    <p class="mt-1 text-xs text-slate-400">العطل: الشاشة لا تستجيب للّمس</p>
-                                    <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-                                        <span class="rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-slate-300">مع الغطاء</span>
-                                        <span class="rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-slate-300">بدون شاحن</span>
-                                        <span class="rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 font-mono text-slate-400" dir="ltr">IMEI 3568…5012</span>
-                                    </div>
-
-                                    <div class="mt-4 border-t border-slate-800 pt-4">
-                                        <p class="mb-2 text-[11px] text-slate-400">مسار الجهاز — اضغط على أي مرحلة</p>
-                                        <ol class="grid grid-cols-4 gap-1.5 text-center text-[11px]">
-                                            <li v-for="(step, idx) in demoSteps" :key="step.short">
-                                                <button
-                                                    type="button"
-                                                    class="w-full rounded-lg border px-1 py-1.5 font-medium transition-colors focus-ring"
-                                                    :class="idx <= activeStep ? 'border-cyan-400/40 bg-cyan-400/15 text-cyan-200' : 'border-slate-800 bg-slate-900 text-slate-500 hover:text-slate-300'"
-                                                    :aria-current="idx === activeStep ? 'step' : undefined"
-                                                    @click="pickStep(idx)"
-                                                >
-                                                    {{ step.short }}
-                                                </button>
-                                            </li>
-                                        </ol>
-                                    </div>
+                            <div class="flex">
+                                <!-- Sidebar -->
+                                <div class="hidden w-14 shrink-0 flex-col items-center gap-2 border-e border-slate-200 bg-slate-50/70 py-4 sm:flex dark:border-white/10 dark:bg-slate-950/40" aria-hidden="true">
+                                    <img :src="LOGO" alt="" class="mb-2 h-8 w-8 rounded-lg" />
+                                    <span
+                                        v-for="(icon, i) in ['grid', 'wrench', 'receipt', 'package', 'wallet', 'chart']"
+                                        :key="icon"
+                                        class="grid h-9 w-9 place-items-center rounded-lg text-[17px]"
+                                        :class="i === 1 ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' : 'text-slate-400'"
+                                    >
+                                        <AppIcon :name="icon" />
+                                    </span>
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5">
-                                        <p class="text-[11px] text-slate-400">أجهزة قيد الصيانة</p>
-                                        <p class="mt-1 text-2xl font-black text-white">18</p>
-                                        <p class="mt-0.5 text-[11px] text-emerald-400">6 جاهزة للتسليم</p>
+                                <div class="min-w-0 flex-1 p-3 sm:p-5">
+                                    <div class="mb-4 flex items-center justify-between gap-3">
+                                        <p class="text-sm font-bold text-slate-900 sm:text-base dark:text-white">{{ t.mockup.boardTitle }}</p>
+                                        <div class="flex gap-2 text-[11px] sm:text-xs">
+                                            <span class="rounded-lg border border-slate-200 px-2.5 py-1 dark:border-white/10">
+                                                <span class="text-slate-500 dark:text-slate-400">{{ t.mockup.activeRepairsLabel }}</span>
+                                                <b class="ms-1.5 text-slate-900 dark:text-white">18</b>
+                                            </span>
+                                            <span class="hidden rounded-lg border border-slate-200 px-2.5 py-1 sm:inline dark:border-white/10">
+                                                <span class="text-slate-500 dark:text-slate-400">{{ t.mockup.todaySalesLabel }}</span>
+                                                <b class="ms-1.5 font-mono text-cyan-600 dark:text-cyan-400" dir="ltr">$1,240</b>
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5">
-                                        <p class="text-[11px] text-slate-400">مبيعات اليوم</p>
-                                        <p class="mt-1 font-mono text-2xl font-black text-cyan-300" dir="ltr">$1,240</p>
-                                        <p class="mt-0.5 text-[11px] text-slate-500">27 فاتورة</p>
-                                    </div>
+
+                                    <ol class="grid grid-cols-4 gap-1.5 sm:gap-3">
+                                        <li v-for="(step, col) in t.mockup.steps" :key="step.short" class="min-w-0">
+                                            <button
+                                                type="button"
+                                                class="mb-2 flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-start text-[10px] font-bold transition focus-ring sm:text-xs"
+                                                :class="col === activeStep ? 'text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'"
+                                                :aria-current="col === activeStep ? 'step' : undefined"
+                                                @click="pickStep(col)"
+                                            >
+                                                <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="stepDot[col]" />
+                                                <span class="truncate">{{ step.label }}</span>
+                                            </button>
+                                            <div class="flex min-h-[156px] flex-col gap-1.5 rounded-xl bg-slate-100/80 p-1.5 sm:min-h-[196px] sm:gap-2 sm:p-2 dark:bg-white/[0.03]">
+                                                <TransitionGroup name="ticket">
+                                                    <div
+                                                        v-if="col === activeStep"
+                                                        key="featured"
+                                                        class="rounded-lg border border-cyan-400/60 bg-white p-2 shadow-md shadow-cyan-500/10 ring-2 ring-cyan-400/20 sm:p-2.5 dark:bg-slate-800"
+                                                    >
+                                                        <p class="font-mono text-[10px] font-bold text-cyan-600 dark:text-cyan-400">{{ t.mockup.ticketNo }}</p>
+                                                        <p class="mt-0.5 truncate text-[11px] font-bold text-slate-900 rtl:text-right sm:text-xs dark:text-white" dir="ltr">iPhone 13 Pro</p>
+                                                        <p class="mt-1 hidden text-[11px] leading-snug text-slate-500 sm:line-clamp-2 dark:text-slate-400">{{ t.mockup.issueDesc }}</p>
+                                                    </div>
+                                                    <div
+                                                        v-for="card in boardCards[col]"
+                                                        :key="card.id"
+                                                        class="rounded-lg border border-slate-200/80 bg-white p-2 sm:p-2.5 dark:border-white/5 dark:bg-slate-800/60"
+                                                    >
+                                                        <p class="font-mono text-[10px] text-slate-400">{{ card.id }}</p>
+                                                        <p class="mt-0.5 truncate text-[11px] font-semibold text-slate-700 rtl:text-right sm:text-xs dark:text-slate-300" dir="ltr">{{ card.device }}</p>
+                                                    </div>
+                                                </TransitionGroup>
+                                            </div>
+                                        </li>
+                                    </ol>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Floating WhatsApp notice once the device is ready -->
+                        <Transition name="pop">
+                            <div
+                                v-if="activeStep === 3"
+                                class="absolute -bottom-6 end-3 flex max-w-[280px] items-start gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:-end-6 sm:p-3.5 dark:border-white/10 dark:bg-slate-800/95"
+                                role="status"
+                            >
+                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-500 text-lg text-white">
+                                    <AppIcon name="message" />
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="block text-[11px] font-semibold text-slate-400">{{ t.mockup.notifyTitle }}</span>
+                                    <span class="block text-xs font-semibold leading-snug text-slate-800 sm:text-sm dark:text-slate-100">{{ t.mockup.notifyText }}</span>
+                                </span>
+                            </div>
+                        </Transition>
                     </div>
                 </div>
             </section>
 
-            <!-- Modules strip -->
-            <section class="border-y border-white/5 bg-white/[0.02] py-8" aria-label="أقسام النظام">
-                <ul class="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-2.5 px-4 sm:gap-3">
-                    <li
-                        v-for="m in modules"
-                        :key="m.label"
-                        class="flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/60 px-4 py-2 text-sm text-slate-300"
+            <!-- Facts band -->
+            <section class="border-y border-slate-200/80 bg-slate-50/70 dark:border-white/5 dark:bg-white/[0.02]">
+                <dl class="mx-auto grid max-w-7xl grid-cols-2 gap-y-8 px-4 py-10 sm:px-6 lg:grid-cols-4 lg:px-8">
+                    <div
+                        v-for="(fact, i) in t.factsSection.items"
+                        :key="fact.label"
+                        class="border-slate-200 px-2 text-center dark:border-white/10"
+                        :class="[i % 2 ? 'border-s' : '', i > 0 ? 'lg:border-s' : '']"
                     >
-                        <span aria-hidden="true">{{ m.icon }}</span>
-                        {{ m.label }}
-                    </li>
-                </ul>
+                        <dt class="sr-only">{{ fact.label }}</dt>
+                        <dd>
+                            <span class="block text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl dark:text-white" dir="ltr">
+                                {{ fact.value }}<span v-if="fact.unit" class="ms-1 text-base font-semibold text-slate-500 dark:text-slate-400">{{ fact.unit }}</span>
+                            </span>
+                            <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">{{ fact.label }}</span>
+                        </dd>
+                    </div>
+                </dl>
             </section>
 
-            <!-- Features -->
-            <section id="features" class="scroll-mt-24 py-20 sm:py-28">
+            <!-- Features (bento) -->
+            <section id="features" class="scroll-mt-20 py-20 sm:py-28">
                 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <SectionHeading
-                        eyebrow="المزايا"
-                        title="كل ما يحتاجه محلّك، بدون برامج متفرقة"
-                        text="صُمّم النظام حول يوم العمل الفعلي في محل الهواتف: زبون على الكاونتر، جهاز للصيانة، فاتورة شراء من المورّد، وصندوق يجب أن يُطابق آخر النهار."
-                    />
+                    <SectionHead :eyebrow="t.featuresSection.eyebrow" :title="t.featuresSection.title" :text="t.featuresSection.text" />
 
-                    <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <div class="mt-14 grid grid-cols-1 gap-4 md:grid-cols-3 lg:gap-5">
                         <article
-                            v-for="f in features"
+                            v-for="(f, i) in t.featuresSection.items"
                             :key="f.title"
-                            class="group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/50 p-7 transition-colors duration-300 hover:border-cyan-400/40"
+                            class="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-slate-200/60 sm:p-8 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:shadow-none"
                             :class="f.wide ? 'md:col-span-2' : ''"
                         >
-                            <span
-                                class="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl border text-xl"
-                                :class="f.tone"
-                                aria-hidden="true"
-                            >{{ f.icon }}</span>
-                            <h3 class="text-xl font-bold text-white">{{ f.title }}</h3>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-400">{{ f.text }}</p>
-                            <ul v-if="f.points" class="mt-5 flex flex-wrap gap-2 text-xs">
-                                <li v-for="p in f.points" :key="p" class="rounded-lg border border-slate-800 bg-slate-950/70 px-2.5 py-1.5 text-slate-300">
-                                    {{ p }}
-                                </li>
-                            </ul>
+                            <span class="grid h-11 w-11 place-items-center rounded-xl text-[22px]" :class="featureTone[i]">
+                                <AppIcon :name="featureIcons[i]" />
+                            </span>
+                            <h3 class="mt-5 text-lg font-bold text-slate-950 sm:text-xl dark:text-white">{{ f.title }}</h3>
+                            <p class="mt-2 max-w-xl text-[15px] leading-7 text-slate-600 dark:text-slate-400">{{ f.text }}</p>
+
+                            <!-- Repair stages as a flow -->
+                            <ol v-if="i === 0" class="mt-auto flex flex-wrap items-center gap-1.5 pt-6 text-xs font-semibold">
+                                <template v-for="(p, n) in f.points" :key="p">
+                                    <li
+                                        class="rounded-full px-3 py-1.5"
+                                        :class="n === f.points.length - 1
+                                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                            : 'bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300'"
+                                    >
+                                        {{ p }}
+                                    </li>
+                                    <li v-if="n < f.points.length - 1" class="text-slate-300 dark:text-slate-600" aria-hidden="true">
+                                        <AppIcon name="arrow-right" class="rtl:rotate-180" />
+                                    </li>
+                                </template>
+                            </ol>
+
+                            <!-- Inventory: reports + a small chart -->
+                            <div v-else-if="f.points" class="mt-auto flex flex-wrap items-end justify-between gap-6 pt-6">
+                                <ul class="flex flex-wrap gap-1.5 text-xs font-semibold">
+                                    <li v-for="p in f.points" :key="p" class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 dark:bg-white/5 dark:text-slate-300">
+                                        {{ p }}
+                                    </li>
+                                </ul>
+                                <div class="flex h-16 items-end gap-1.5" dir="ltr" aria-hidden="true">
+                                    <span
+                                        v-for="(h, b) in [35, 55, 42, 70, 58, 85, 100]"
+                                        :key="b"
+                                        class="w-3 rounded-t bg-gradient-to-t from-emerald-500/40 to-emerald-400 transition-[height] duration-500 group-hover:from-emerald-500/60"
+                                        :style="{ height: `${h}%` }"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Currencies -->
+                            <div v-else-if="featureIcons[i] === 'exchange'" class="mt-auto flex items-center gap-3 pt-6 font-mono text-sm font-bold" dir="ltr" aria-hidden="true">
+                                <span class="rounded-xl bg-sky-500/10 px-3 py-2 text-sky-700 dark:text-sky-300">USD</span>
+                                <AppIcon name="exchange" class="text-slate-400" />
+                                <span class="rounded-xl bg-sky-500/10 px-3 py-2 text-sky-700 dark:text-sky-300">SYP</span>
+                            </div>
                         </article>
                     </div>
                 </div>
             </section>
 
-            <!-- How it works -->
-            <section id="workflow" class="scroll-mt-24 border-y border-white/5 bg-gradient-to-b from-transparent via-slate-950/70 to-transparent py-20 sm:py-28">
-                <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <SectionHeading
-                        eyebrow="مسار الصيانة"
-                        title="من استلام الجهاز حتى تسليمه، في أربع خطوات"
-                        text="كل جهاز له سجل واضح: من استلمه، ما العطل، من الخبير المسؤول، وكم دُفع منه."
-                    />
+            <!-- Workflow -->
+            <section id="workflow" class="scroll-mt-20 bg-slate-950 py-20 text-slate-300 sm:py-28 dark:bg-white/[0.02]">
+                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <SectionHead :eyebrow="t.workflowSection.eyebrow" :title="t.workflowSection.title" :text="t.workflowSection.text" inverted />
 
-                    <ol class="relative grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                        <li
-                            v-for="(step, idx) in workflow"
-                            :key="step.title"
-                            class="relative rounded-3xl border border-white/10 bg-slate-900/50 p-6"
-                        >
-                            <span class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 font-mono text-base font-black text-slate-950">
-                                {{ idx + 1 }}
+                    <ol class="relative mt-16 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+                        <span class="absolute inset-x-[12%] top-6 hidden h-px bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0 lg:block" aria-hidden="true" />
+                        <li v-for="step in t.workflowSection.steps" :key="step.number" class="relative text-center">
+                            <span class="relative mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-cyan-400/30 bg-slate-900 font-mono text-lg font-bold text-cyan-300 shadow-[0_0_30px_-6px_rgba(34,211,238,0.6)]">
+                                {{ step.number }}
                             </span>
-                            <h3 class="text-lg font-bold text-white">{{ step.title }}</h3>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-400">{{ step.text }}</p>
+                            <h3 class="mt-5 text-lg font-bold text-white">{{ step.title }}</h3>
+                            <p class="mx-auto mt-2 max-w-xs text-[15px] leading-7 text-slate-400">{{ step.text }}</p>
                         </li>
                     </ol>
                 </div>
             </section>
 
-            <!-- Why -->
-            <section id="why" class="scroll-mt-24 py-20 sm:py-28">
+            <!-- Modules -->
+            <section id="modules" class="scroll-mt-20 py-20 sm:py-28">
                 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <SectionHeading
-                        eyebrow="لماذا هذا النظام"
-                        title="مبني للعمل اليومي، لا للعرض فقط"
-                    />
-                    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                        <div v-for="w in whyItems" :key="w.title" class="rounded-3xl border border-white/10 bg-slate-900/50 p-6">
-                            <svg v-if="w.flag" class="h-8 w-12 rounded-[3px] shadow ring-1 ring-white/15" viewBox="0 0 900 600" role="img" aria-label="علم سوريا">
+                    <SectionHead :eyebrow="t.nav.modules" :title="t.modulesSection.title" />
+                    <ul class="mx-auto mt-12 grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                        <li
+                            v-for="(m, i) in t.modulesSection.list"
+                            :key="m.label"
+                            class="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-6 text-center text-sm font-semibold text-slate-800 transition hover:border-cyan-400/60 hover:shadow-lg hover:shadow-cyan-500/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:border-cyan-400/40"
+                        >
+                            <span class="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-600/10 text-[21px] text-cyan-600 dark:text-cyan-400">
+                                <AppIcon :name="moduleIcons[i]" />
+                            </span>
+                            {{ m.label }}
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Why us -->
+            <section id="why" class="scroll-mt-20 border-t border-slate-200/80 bg-slate-50/70 py-20 sm:py-28 dark:border-white/5 dark:bg-white/[0.02]">
+                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <SectionHead :eyebrow="t.whyUsSection.eyebrow" :title="t.whyUsSection.title" />
+                    <div class="mt-14 grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+                        <div v-for="(w, i) in t.whyUsSection.items" :key="w.title">
+                            <svg v-if="w.flag" class="h-9 w-[54px] rounded-md shadow-sm ring-1 ring-slate-900/10 dark:ring-white/15" viewBox="0 0 900 600" role="img" :aria-label="w.title">
                                 <rect width="900" height="200" fill="#007A3D" />
                                 <rect y="200" width="900" height="200" fill="#FFFFFF" />
                                 <rect y="400" width="900" height="200" fill="#000000" />
                                 <path fill="#CE1126" d="M225.0,238.0 L238.9,280.8 L284.0,280.8 L247.5,307.3 L261.4,350.2 L225.0,323.7 L188.6,350.2 L202.5,307.3 L166.0,280.8 L211.1,280.8Z M450.0,238.0 L463.9,280.8 L509.0,280.8 L472.5,307.3 L486.4,350.2 L450.0,323.7 L413.6,350.2 L427.5,307.3 L391.0,280.8 L436.1,280.8Z M675.0,238.0 L688.9,280.8 L734.0,280.8 L697.5,307.3 L711.4,350.2 L675.0,323.7 L638.6,350.2 L652.5,307.3 L616.0,280.8 L661.1,280.8Z" />
                             </svg>
-                            <div v-else class="text-3xl" aria-hidden="true">{{ w.icon }}</div>
-                            <h3 class="mt-4 text-lg font-bold text-white">{{ w.title }}</h3>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-400">{{ w.text }}</p>
+                            <span v-else class="grid h-11 w-11 place-items-center rounded-xl bg-slate-900 text-[20px] text-white dark:bg-white dark:text-slate-900">
+                                <AppIcon :name="whyIcons[i]" />
+                            </span>
+                            <h3 class="mt-5 text-lg font-bold text-slate-950 dark:text-white">{{ w.title }}</h3>
+                            <p class="mt-2 text-[15px] leading-7 text-slate-600 dark:text-slate-400">{{ w.text }}</p>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- FAQ -->
-            <section id="faq" class="scroll-mt-24 border-t border-white/5 bg-slate-950/40 py-20 sm:py-28">
-                <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-                    <SectionHeading eyebrow="أسئلة شائعة" title="إجابات سريعة" />
-
-                    <div class="space-y-3">
-                        <div
-                            v-for="(faq, idx) in faqs"
+            <section id="faq" class="scroll-mt-20 py-20 sm:py-28">
+                <div class="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:px-8">
+                    <div class="lg:col-span-4">
+                        <SectionHead :eyebrow="t.faqSection.eyebrow" :title="t.faqSection.title" align="start" />
+                    </div>
+                    <div class="divide-y divide-slate-200 border-y border-slate-200 lg:col-span-8 dark:divide-white/10 dark:border-white/10">
+                        <details
+                            v-for="(faq, idx) in allFaqs"
                             :key="faq.q"
-                            class="overflow-hidden rounded-2xl border transition-colors"
-                            :class="openFaq === idx ? 'border-cyan-400/30 bg-slate-900/80' : 'border-white/10 bg-slate-900/50'"
+                            class="faq group"
+                            :open="idx === 0"
                         >
-                            <h3>
-                                <button
-                                    :id="`faq-q-${idx}`"
-                                    type="button"
-                                    class="flex w-full items-center justify-between gap-4 p-5 text-start text-base font-bold text-white hover:text-cyan-200 focus-ring sm:p-6"
-                                    :aria-expanded="openFaq === idx"
-                                    :aria-controls="`faq-a-${idx}`"
-                                    @click="openFaq = openFaq === idx ? -1 : idx"
-                                >
-                                    <span>{{ faq.q }}</span>
-                                    <svg
-                                        class="h-5 w-5 shrink-0 text-cyan-300 transition-transform duration-200"
-                                        :class="openFaq === idx ? 'rotate-180' : ''"
-                                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"
-                                    ><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                                </button>
-                            </h3>
-                            <div
-                                v-show="openFaq === idx"
-                                :id="`faq-a-${idx}`"
-                                role="region"
-                                :aria-labelledby="`faq-q-${idx}`"
-                                class="px-5 pb-5 text-sm leading-relaxed text-slate-300 sm:px-6 sm:pb-6"
-                            >
-                                {{ faq.a }}
-                            </div>
-                        </div>
+                            <summary class="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-start text-base font-semibold text-slate-900 transition hover:text-cyan-700 focus-ring sm:text-lg dark:text-white dark:hover:text-cyan-300">
+                                {{ faq.q }}
+                                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition group-open:rotate-45 group-open:border-cyan-500 group-open:bg-cyan-500 group-open:text-white dark:border-white/15">
+                                    <AppIcon name="plus" />
+                                </span>
+                            </summary>
+                            <p class="max-w-2xl pb-6 pe-12 text-[15px] leading-7 text-slate-600 dark:text-slate-400">{{ faq.a }}</p>
+                        </details>
                     </div>
                 </div>
             </section>
 
-            <!-- Final CTA -->
-            <section class="py-20 sm:py-24">
-                <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-                    <div class="relative overflow-hidden rounded-3xl border border-cyan-400/30 bg-gradient-to-br from-blue-800/60 via-slate-900 to-cyan-900/50 px-6 py-12 text-center shadow-[0_0_80px_rgba(34,211,238,0.15)] sm:px-14 sm:py-16">
-                        <h2 class="text-2xl font-black leading-snug text-white sm:text-4xl">جاهز لتبدأ يومك من لوحة واحدة؟</h2>
-                        <p class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-slate-300">
-                            <template v-if="signup">أنشئ متجرك الآن وجرّب النظام كاملاً مجاناً لمدة {{ signup.trialDays }} يوماً.</template>
-                            <template v-else>سجّل الدخول بحسابك وتابع المبيعات والصيانة والصندوق من أي جهاز.</template>
-                        </p>
-                        <div class="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-                            <router-link
-                                :to="primaryCta.to"
-                                class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-l from-cyan-400 to-blue-500 px-8 py-4 text-base font-bold text-slate-950 shadow-xl shadow-cyan-500/25 transition hover:brightness-110 focus-ring"
-                            >
-                                {{ primaryCta.label }}
-                            </router-link>
-                            <router-link
-                                v-if="signup"
-                                :to="{ name: 'login' }"
-                                class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-ring"
-                            >
-                                تسجيل الدخول
-                            </router-link>
-                            <a
-                                v-else-if="contactUrl"
-                                :href="contactUrl"
-                                target="_blank"
-                                rel="noopener"
-                                class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-ring"
-                            >
-                                تواصل معنا
-                            </a>
-                        </div>
+            <!-- Final call to action -->
+            <section class="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
+                <div class="relative isolate mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-16 text-center sm:px-16 sm:py-20 dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 dark:ring-1 dark:ring-white/10">
+                    <div class="hero-grid hero-grid-dark pointer-events-none absolute inset-0 -z-10 opacity-60" aria-hidden="true" />
+                    <div class="pointer-events-none absolute -top-40 left-1/2 -z-10 h-80 w-[min(720px,120%)] -translate-x-1/2 rounded-full bg-cyan-500/30 blur-3xl" aria-hidden="true" />
+                    <h2 class="mx-auto max-w-2xl text-balance text-3xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
+                        {{ t.ctaSection.title }}
+                    </h2>
+                    <p class="mx-auto mt-5 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
+                        {{ signup ? t.ctaSection.subtitleTrial.replace('{days}', signup.trialDays) : t.ctaSection.subtitleStandard }}
+                    </p>
+                    <div class="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+                        <router-link
+                            :to="primaryCta.to"
+                            class="group inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-slate-950 transition hover:bg-cyan-50 focus-ring"
+                        >
+                            {{ primaryCta.label }}
+                            <AppIcon name="arrow-right" class="transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
+                        </router-link>
+                        <router-link
+                            v-if="signup"
+                            :to="{ name: 'login' }"
+                            class="inline-flex items-center justify-center rounded-full px-8 py-3.5 text-base font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/10 focus-ring"
+                        >
+                            {{ t.nav.login }}
+                        </router-link>
                     </div>
                 </div>
             </section>
         </main>
 
-        <footer class="relative z-10 border-t border-white/5 bg-[#05080F] py-10 text-sm text-slate-500">
-            <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-center sm:flex-row sm:px-6 sm:text-start lg:px-8">
-                <div class="flex items-center gap-3">
-                    <img :src="LOGO" alt="" class="h-8 w-8 rounded-lg opacity-90" />
-                    <span class="font-semibold text-slate-300">{{ BRAND.name }}</span>
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 dark:border-white/10">
+            <div class="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-12 lg:px-8">
+                <div class="md:col-span-6">
+                    <div class="flex items-center gap-2.5">
+                        <img :src="LOGO" alt="" class="h-9 w-9 rounded-xl" />
+                        <span class="font-bold text-slate-950 dark:text-white">{{ t.brand.name }}</span>
+                    </div>
+                    <p class="mt-4 max-w-sm text-sm leading-6 text-slate-500 dark:text-slate-400">{{ t.brand.tagline }}</p>
                 </div>
-                <p>© {{ currentYear }} {{ BRAND.company }}. جميع الحقوق محفوظة.</p>
+                <nav class="md:col-span-3" :aria-label="t.footer.product">
+                    <p class="text-sm font-bold text-slate-950 dark:text-white">{{ t.footer.product }}</p>
+                    <ul class="mt-4 space-y-3 text-sm">
+                        <li v-for="link in navLinks" :key="link.id">
+                            <a :href="`#${link.id}`" class="text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white" @click="onLinkClick(link.id)">{{ link.label }}</a>
+                        </li>
+                    </ul>
+                </nav>
+                <nav class="md:col-span-3" :aria-label="t.footer.account">
+                    <p class="text-sm font-bold text-slate-950 dark:text-white">{{ t.footer.account }}</p>
+                    <ul class="mt-4 space-y-3 text-sm">
+                        <li v-if="signup">
+                            <router-link :to="{ name: 'register' }" class="text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">{{ t.nav.register }}</router-link>
+                        </li>
+                        <li>
+                            <router-link :to="{ name: 'login' }" class="text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">{{ t.nav.login }}</router-link>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="border-t border-slate-200 dark:border-white/10">
+                <p class="mx-auto max-w-7xl px-4 py-6 text-center text-xs text-slate-500 sm:px-6 sm:text-start lg:px-8 dark:text-slate-500">
+                    © {{ currentYear }} {{ t.brand.company }}. {{ t.footer.copyright }}
+                </p>
             </div>
         </footer>
     </div>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import AppIcon from '../../components/ui/AppIcon.vue';
 import { tenancy } from '../../tenancy';
+import { useTheme } from '../../composables/useTheme';
+import { useI18n } from '../../composables/useI18n';
 
-/**
- * Public-facing details. Fill `whatsapp` (international format, digits only,
- * e.g. '9639XXXXXXXX') to show the "request a copy" / "contact us" buttons.
- */
-const BRAND = {
-    name: 'نظام الهواتف والإكسسوارات',
-    company: 'داماتك لتقنية المعلومات',
-    whatsapp: '',
-};
+const { isDark, toggleTheme } = useTheme();
+const { t, toggleLocale } = useI18n();
 
-const contactUrl = computed(() => {
-    const phone = BRAND.whatsapp.replace(/\D/g, '');
-    if (!phone) return '';
-    const text = encodeURIComponent('مرحباً، أرغب بالاستفسار عن نظام الهواتف والإكسسوارات لمحلي.');
-    return `https://wa.me/${phone}?text=${text}`;
-});
-
-// Bound, not a static src: the icon lives in public/ and must not go through the bundler.
 const LOGO = '/icons/icon-192.png';
 const currentYear = new Date().getFullYear();
-
-const SectionHeading = defineComponent({
-    props: { eyebrow: String, title: String, text: String },
-    setup: (props) => () =>
-        h('div', { class: 'mx-auto mb-12 max-w-3xl space-y-4 text-center sm:mb-16' }, [
-            h('span', { class: 'inline-block rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200' }, props.eyebrow),
-            h('h2', { class: 'text-2xl font-black leading-snug text-white sm:text-4xl' }, props.title),
-            props.text ? h('p', { class: 'text-base leading-relaxed text-slate-400' }, props.text) : null,
-        ]),
-});
-
-const navLinks = [
-    { href: '#features', label: 'المزايا' },
-    { href: '#workflow', label: 'مسار الصيانة' },
-    { href: '#why', label: 'لماذا نحن' },
-    { href: '#faq', label: 'الأسئلة الشائعة' },
-];
-
-// Self-service sign-up, offered only on the public site (tenancy.signup).
 const signup = tenancy.signup;
 
-const primaryCta = signup
-    ? { to: { name: 'register' }, label: 'أنشئ متجرك مجاناً', short: 'جرّب مجاناً' }
-    : { to: { name: 'login' }, label: 'الدخول إلى النظام', short: 'تسجيل الدخول' };
+// Shared button styles
+const btnPrimary =
+    'inline-flex items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:shadow-blue-600/40 hover:brightness-110 focus-ring';
+const btnGhost =
+    'inline-flex items-center justify-center rounded-full bg-white font-semibold text-slate-900 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:ring-slate-300 focus-ring dark:bg-white/5 dark:text-white dark:ring-white/15 dark:hover:bg-white/10';
+const iconBtn =
+    'inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus-ring dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white';
 
-const heroPoints = signup
-    ? [`تجربة مجانية ${signup.trialDays} يوماً`, 'بدون بطاقة دفع', 'متجرك جاهز خلال دقيقة']
-    : ['يعمل من المتصفح ويُثبَّت كتطبيق', 'طباعة إيصالات وفواتير', 'صلاحيات لكل موظف'];
-
-const modules = [
-    { icon: '🧾', label: 'المبيعات' },
-    { icon: '📦', label: 'المشتريات' },
-    { icon: '🔧', label: 'الصيانة' },
-    { icon: '🏷️', label: 'المخزون والمواد' },
-    { icon: '💵', label: 'الصندوق والدفعات' },
-    { icon: '📉', label: 'المصاريف' },
-    { icon: '👥', label: 'العملاء والموردون' },
-    { icon: '📈', label: 'التقارير' },
+// Icons follow the order of the matching lists in useI18n.
+const featureIcons = ['wrench', 'user-cog', 'receipt', 'package', 'exchange', 'shield'];
+const featureTone = [
+    'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+    'bg-rose-500/10 text-rose-600 dark:text-rose-400',
 ];
+const moduleIcons = ['receipt', 'cart', 'wrench', 'tag', 'wallet', 'trending-down', 'users', 'chart'];
+const whyIcons = ['zap', 'smartphone', 'printer'];
 
-const features = [
-    {
-        icon: '🔧',
-        tone: 'border-cyan-400/20 bg-cyan-400/10',
-        wide: true,
-        title: 'استلام أجهزة الصيانة وتتبّعها',
-        text: 'سجّل الجهاز والعطل والملحقات المستلمة والسيريال/IMEI خلال ثوانٍ، واطبع إيصال الاستلام للزبون، ثم أرسل له إشعار واتساب بضغطة زر.',
-        points: ['مستلَم', 'قيد الفحص', 'قيد الإصلاح', 'بانتظار موافقة العميل', 'جاهز للتسليم', 'تم التسليم'],
+/** Section heading: eyebrow, title and optional lead text. */
+const SectionHead = defineComponent({
+    props: { eyebrow: String, title: String, text: String, inverted: Boolean, align: { type: String, default: 'center' } },
+    setup(props) {
+        return () =>
+            h('div', { class: ['max-w-3xl', props.align === 'center' ? 'mx-auto text-center' : 'text-center lg:text-start'] }, [
+                h('p', { class: ['text-sm font-semibold', props.inverted ? 'text-cyan-400' : 'text-cyan-600 dark:text-cyan-400'] }, props.eyebrow),
+                h('h2', { class: ['mt-3 text-balance text-3xl font-bold leading-tight tracking-tight sm:text-[2.75rem] sm:leading-[1.15]', props.inverted ? 'text-white' : 'text-slate-950 dark:text-white'] }, props.title),
+                props.text
+                    ? h('p', { class: ['mx-auto mt-5 max-w-2xl text-pretty text-base leading-8 sm:text-lg', props.inverted ? 'text-slate-400' : 'text-slate-600 dark:text-slate-400'] }, props.text)
+                    : null,
+            ]);
     },
-    {
-        icon: '🧑‍🔧',
-        tone: 'border-amber-400/20 bg-amber-400/10',
-        title: 'حسابات خبراء الصيانة',
-        text: 'حدّد نسبة كل خبير من قيمة الإصلاح، وتابع مستحقاته ورصيده في كشف حساب واضح.',
-    },
-    {
-        icon: '🧾',
-        tone: 'border-blue-400/20 bg-blue-400/10',
-        title: 'فواتير بيع وشراء سريعة',
-        text: 'أضف المواد بالبحث أو بقارئ الباركود، واحفظ الفاتورة نقداً أو آجلاً على حساب الزبون أو المورّد.',
-    },
-    {
-        icon: '🏷️',
-        tone: 'border-emerald-400/20 bg-emerald-400/10',
-        wide: true,
-        title: 'مخزون دقيق وأرصدة واضحة',
-        text: 'كل بيع وشراء يُحدّث المخزون مباشرة. تقارير الأرباح، حركة المواد، المواد الناقصة، وأرصدة الزبائن والموردين جاهزة لأي فترة تختارها.',
-        points: ['تقرير الأرباح', 'حركة المخزون', 'المواد الناقصة', 'أرصدة الحسابات', 'ملخص الفترة'],
-    },
-    {
-        icon: '💱',
-        tone: 'border-sky-400/20 bg-sky-400/10',
-        wide: true,
-        title: 'صندوق ودفعات بعدّة عملات',
-        text: 'سجّل المقبوضات والمدفوعات والمصاريف بالعملة التي تتعامل بها، مع احتساب تلقائي بالعملة الأساسية حتى يبقى الصندوق مطابقاً.',
-    },
-    {
-        icon: '🔐',
-        tone: 'border-rose-400/20 bg-rose-400/10',
-        title: 'أدوار وصلاحيات',
-        text: 'كل موظف يرى ما يخصّه فقط: موظف الكاونتر، خبير الصيانة، أو المدير.',
-    },
-];
+});
 
-const workflow = [
-    { title: 'الاستلام', text: 'بيانات الزبون والجهاز والعطل والملحقات، مع إيصال مطبوع.' },
-    { title: 'الفحص والإصلاح', text: 'إسناد الجهاز لخبير وتحديث حالته وتكلفته التقديرية.' },
-    { title: 'إبلاغ الزبون', text: 'رسالة واتساب جاهزة عند كل مرحلة مهمة، بدون اتصالات متكررة.' },
-    { title: 'التسليم والتحصيل', text: 'تسوية المبلغ، تسجيله في الصندوق، واحتساب حصة الخبير.' },
-];
+const navLinks = computed(() => [
+    { id: 'features', label: t.value.nav.features },
+    { id: 'workflow', label: t.value.nav.workflow },
+    { id: 'modules', label: t.value.nav.modules },
+    { id: 'why', label: t.value.nav.whyUs },
+    { id: 'faq', label: t.value.nav.faq },
+]);
 
-const whyItems = [
-    { icon: '⚡', title: 'سريع على الكاونتر', text: 'واجهة مختصرة تقلل النقرات في أكثر العمليات تكراراً.' },
-    { icon: '📱', title: 'على أي جهاز', text: 'يعمل على الحاسوب والتابلت والجوال، ويمكن تثبيته كتطبيق.' },
-    { icon: '🖨️', title: 'طباعة مرنة', text: 'إعدادات طباعة لكل جهاز، من الطابعة الحرارية إلى A4.' },
-    { flag: true, title: 'عربي بالكامل', text: 'مصمم بالعربية من اليوم الأول، مع دعم فني محلي.' },
-];
+const primaryCta = computed(() =>
+    signup
+        ? { to: { name: 'register' }, label: t.value.nav.register, short: t.value.nav.quickTrial }
+        : { to: { name: 'login' }, label: t.value.hero.ctaLogin, short: t.value.nav.login }
+);
 
-const faqs = [
-    ...(signup
-        ? [{
-            q: 'كيف أبدأ؟ وماذا يحدث بعد الفترة التجريبية؟',
-            a: `أنشئ متجرك من زر "أنشئ متجرك مجاناً" فتحصل على عنوان خاص بمتجرك وقاعدة بيانات مستقلة خلال دقيقة. التجربة مجانية لمدة ${signup.trialDays} يوماً وبكل المزايا، وقبل انتهائها تواصل معنا لتفعيل الاشتراك دون أن تفقد أي بيانات.`,
-        }]
-        : []),
-    {
-        q: 'هل أحتاج لتثبيت برنامج على الحاسوب؟',
-        a: 'لا. يعمل النظام من المتصفح مباشرة، ويمكنك تثبيته على الجوال أو الحاسوب كتطبيق من خيار "التثبيت" في المتصفح.',
-    },
-    {
-        q: 'هل يمكن لأكثر من موظف العمل في نفس الوقت؟',
-        a: 'نعم، لكل موظف حسابه وصلاحياته، ويعمل الجميع على نفس البيانات لحظياً.',
-    },
-    {
-        q: 'هل يدعم طابعات الإيصالات الحرارية؟',
-        a: 'نعم، يمكن ضبط إعدادات الطباعة لكل جهاز على حدة، بما يناسب الطابعات الحرارية أو طابعات A4.',
-    },
-    {
-        q: 'كيف أبلّغ الزبون عن جاهزية جهازه؟',
-        a: 'بعد استلام الجهاز أو تغيير حالته يُجهّز النظام رسالة واتساب بتفاصيل الجهاز، ترسلها للزبون بضغطة واحدة.',
-    },
-    {
-        q: 'هل بياناتي محفوظة إذا انقطع الإنترنت؟',
-        a: 'البيانات محفوظة على الخادم وليس على جهازك. عند انقطاع الاتصال يُظهر النظام تنبيهاً بدلاً من عرض أرقام قديمة، فتبقى الأسعار والأرصدة دقيقة دائماً.',
-    },
-];
-const openFaq = ref(0);
+const heroPoints = computed(() =>
+    signup ? t.value.hero.pointsWithTrial.map((p) => p.replace('{days}', signup.trialDays)) : t.value.hero.pointsStandard
+);
 
-// Hero mockup: the ticket walks through the repair statuses on its own until
-// the visitor picks a step.
-const demoSteps = [
-    { short: 'استلام', label: 'مستلَم', badge: 'border-slate-500/40 bg-slate-500/15 text-slate-200' },
-    { short: 'فحص', label: 'قيد الفحص', badge: 'border-amber-400/40 bg-amber-400/15 text-amber-200' },
-    { short: 'إصلاح', label: 'قيد الإصلاح', badge: 'border-blue-400/40 bg-blue-400/15 text-blue-200' },
-    { short: 'جاهز', label: 'جاهز للتسليم', badge: 'border-emerald-400/40 bg-emerald-400/15 text-emerald-200' },
+const allFaqs = computed(() => {
+    const trial = signup && t.value.faqSection.trialFaq;
+    const first = trial ? [{ q: trial.q, a: trial.a.replace('{days}', signup.trialDays) }] : [];
+    return [...first, ...(t.value.faqSection.items || [])];
+});
+
+// ------------------------------------------------------------ Repair board demo
+const stepDot = ['bg-slate-400', 'bg-amber-400', 'bg-blue-500', 'bg-emerald-500'];
+const boardCards = [
+    [{ id: '#1047', device: 'Galaxy A54' }, { id: '#1046', device: 'Redmi Note 12' }],
+    [{ id: '#1044', device: 'iPhone 11' }],
+    [{ id: '#1040', device: 'Galaxy S23 Ultra' }, { id: '#1039', device: 'Pixel 7' }],
+    [{ id: '#1035', device: 'iPhone 14' }],
 ];
-const activeStep = ref(1);
+const activeStep = ref(0);
 let stepTimer = null;
 
 function stopAutoplay() {
-    if (stepTimer) clearInterval(stepTimer);
+    clearInterval(stepTimer);
     stepTimer = null;
 }
 
@@ -585,23 +609,48 @@ function pickStep(idx) {
     activeStep.value = idx;
 }
 
-// Header turns solid once the page scrolls under it.
+// ------------------------------------------------------------ Header & scrollspy
 const scrolled = ref(false);
 const menuOpen = ref(false);
+const activeSection = ref('');
+let sectionObserver = null;
+
 function onScroll() {
     scrolled.value = window.scrollY > 8;
 }
 
+function onLinkClick(id) {
+    menuOpen.value = false;
+    activeSection.value = id;
+}
+
+function setupScrollspy() {
+    const elements = navLinks.value.map((l) => document.getElementById(l.id)).filter(Boolean);
+    sectionObserver = new IntersectionObserver(
+        (entries) => {
+            const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+            if (visible.length) activeSection.value = visible[0].target.id;
+        },
+        { rootMargin: '-30% 0px -55% 0px' }
+    );
+    elements.forEach((el) => sectionObserver.observe(el));
+}
+
+function setTitle() {
+    document.title = `${t.value.brand.name} | ${t.value.brand.company}`;
+}
+watch(() => t.value.brand.name, setTitle);
+
 onMounted(() => {
-    document.title = `${BRAND.name} | ${BRAND.company}`;
+    setTitle();
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
+    setupScrollspy();
 
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (!reduceMotion) {
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         document.documentElement.style.scrollBehavior = 'smooth';
         stepTimer = setInterval(() => {
-            activeStep.value = (activeStep.value + 1) % demoSteps.length;
+            activeStep.value = (activeStep.value + 1) % 4;
         }, 2600);
     }
 });
@@ -610,26 +659,88 @@ onBeforeUnmount(() => {
     window.removeEventListener('scroll', onScroll);
     document.documentElement.style.scrollBehavior = '';
     stopAutoplay();
+    sectionObserver?.disconnect();
 });
 </script>
 
 <style scoped>
 .focus-ring:focus-visible {
-    outline: 2px solid rgb(103 232 249);
+    outline: 2px solid rgb(6 182 212);
     outline-offset: 2px;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-    transition: opacity 0.2s ease;
+/* Faint grid that fades out from the top centre */
+.hero-grid {
+    background-image:
+        linear-gradient(to right, rgb(15 23 42 / 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgb(15 23 42 / 0.06) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
 }
-.fade-enter-from,
-.fade-leave-to {
+:global(.dark) .hero-grid,
+.hero-grid-dark {
+    background-image:
+        linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+}
+
+.faq summary::-webkit-details-marker {
+    display: none;
+}
+
+/* Hero entrance */
+.enter {
+    animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.enter-delay {
+    animation-delay: 0.15s;
+}
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+}
+
+.ticket-enter-active,
+.ticket-leave-active,
+.ticket-move {
+    transition: all 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.ticket-enter-from {
     opacity: 0;
+    transform: scale(0.92) translateY(-6px);
+}
+.ticket-leave-to {
+    opacity: 0;
+    transform: scale(0.92);
+}
+
+.pop-enter-active,
+.pop-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.pop-enter-from,
+.pop-leave-to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+}
+
+.drop-enter-active,
+.drop-leave-active {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.drop-enter-from,
+.drop-leave-to {
+    opacity: 0;
+    transform: translateY(-6px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .landing * {
+    .landing *,
+    .landing *::before,
+    .landing *::after {
+        animation: none !important;
         transition: none !important;
     }
 }
