@@ -11,6 +11,7 @@
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="الهواتف" />
+        <meta name="description" content="نظام متكامل لمحلات الهواتف ومراكز الصيانة: المبيعات والمشتريات، استلام أجهزة الصيانة وتتبّعها، المخزون والصندوق والتقارير — من داماتك لتقنية المعلومات." />
         <title>{{ config('app.name') }}</title>
         @vite(['resources/js/app.js'])
     </head>

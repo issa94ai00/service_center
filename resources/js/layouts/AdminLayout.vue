@@ -415,7 +415,7 @@ const navSections = [
     {
         label: '',
         items: [
-            { to: '/', label: 'لوحة التحكم', icon: '📊' },
+            { to: '/dashboard', label: 'لوحة التحكم', icon: '📊' },
             { to: '/reports', label: 'التقارير المالية', icon: '📈', badge: 'جديد', permission: 'reports.view', feature: 'reports' },
         ],
     },

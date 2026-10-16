@@ -4,6 +4,13 @@ import { useFeaturesStore } from '../stores/features';
 
 const routes = [
     {
+        path: '/',
+        name: 'landing',
+        component: () => import('../views/landing/LandingView.vue'),
+        meta: { guest: true },
+    },
+    { path: '/landing', redirect: '/' },
+    {
         path: '/login',
         name: 'login',
         component: () => import('../views/auth/LoginView.vue'),
@@ -15,7 +22,7 @@ const routes = [
         meta: { requiresAuth: true },
         children: [
             {
-                path: '',
+                path: 'dashboard',
                 name: 'dashboard',
                 component: () => import('../views/dashboard/DashboardView.vue'),
             },
@@ -221,6 +228,11 @@ router.beforeEach(async (to) => {
 
     if (to.meta.guest && auth.isAuthenticated) {
         return { name: 'dashboard' };
+    }
+
+    // The installed app opens at "/"; staff there want the sign-in form, not the marketing page.
+    if (to.name === 'landing' && window.matchMedia?.('(display-mode: standalone)').matches) {
+        return { name: 'login' };
     }
 
     if (!features.loaded && auth.isAuthenticated) {

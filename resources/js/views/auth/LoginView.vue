@@ -160,6 +160,16 @@
                     </svg>
                     {{ auth.loading ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول' }}
                 </button>
+
+                <div class="pt-4 text-center border-t border-slate-100">
+                    <router-link
+                        :to="{ name: 'landing' }"
+                        class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 font-medium transition-colors"
+                    >
+                        <span>تعرّف على مزايا النظام</span>
+                        <span>←</span>
+                    </router-link>
+                </div>
             </form>
         </div>
     </div>
@@ -251,7 +261,7 @@ async function submit() {
             remember: remember.value,
         });
         persistEmail();
-        router.replace(route.query.redirect || '/');
+        router.replace(route.query.redirect || { name: 'dashboard' });
     } catch (e) {
         if (e?.response?.status === 429) {
             error.value = 'محاولات كثيرة. أعد المحاولة بعد لحظات.';
