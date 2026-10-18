@@ -6,14 +6,38 @@
                 <h1 class="text-xl font-bold text-slate-900">أجهزة الصيانة</h1>
                 <p class="text-sm text-slate-500">استلام أجهزة الهواتف ومتابعة أعمال الصيانة حتى التسليم</p>
             </div>
-            <button
-                v-if="can('repairs.create')"
-                type="button"
-                class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                @click="openCreate"
-            >
-                <span class="text-base leading-none">＋</span> استلام جهاز
-            </button>
+            <div class="flex items-center gap-2.5">
+                <!-- View Mode Switcher -->
+                <div class="flex rounded-xl bg-slate-200/80 p-0.5 text-xs font-semibold">
+                    <button
+                        type="button"
+                        class="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+                        :class="viewMode === 'table' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
+                        @click="viewMode = 'table'"
+                    >
+                        <span>📋</span>
+                        <span>جدول</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+                        :class="viewMode === 'kanban' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
+                        @click="viewMode = 'kanban'"
+                    >
+                        <span>🗂️</span>
+                        <span>لوحة الورشة (كانبان)</span>
+                    </button>
+                </div>
+
+                <button
+                    v-if="can('repairs.create')"
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                    @click="openCreate"
+                >
+                    <span class="text-base leading-none">＋</span> استلام جهاز
+                </button>
+            </div>
         </div>
 
         <!-- Status chips: the shop's real question is "how many are ready, how

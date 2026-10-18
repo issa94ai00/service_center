@@ -152,11 +152,18 @@
                 <p v-if="errors.reported_issue" class="mt-1 text-xs text-red-600">{{ errors.reported_issue }}</p>
             </Field>
 
+            <!-- 30-Sec Fast Intake: Lock Pattern & Functional Pre-Inspection -->
+            <RepairDeviceIntakeCard
+                :initial-notes="form.notes"
+                @update="onIntakeCardUpdate"
+            />
+
             <Field label="ملاحظات داخلية (لا تظهر للعميل على الإيصال)">
                 <textarea
                     v-model.trim="form.notes"
                     rows="2"
                     maxlength="1000"
+                    placeholder="أي ملاحظات إضافية خاصة بالمحل..."
                     class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2"
                     :class="fieldClass('notes')"
                 ></textarea>
@@ -403,6 +410,7 @@ import CustomerSelect from './CustomerSelect.vue';
 import { techniciansApi } from '../../services/api';
 import BrandSelect from './BrandSelect.vue';
 import MethodPicker from '../repairs/PaymentMethodPicker.vue';
+import RepairDeviceIntakeCard from '../repairs/RepairDeviceIntakeCard.vue';
 import { repairsApi } from '../../services/api';
 import { usePermissions } from '../../composables/usePermissions';
 import { paymentMethodLabel } from '../../constants/paymentMethods';
@@ -434,6 +442,11 @@ const customType = ref(false);
 const customTypeInput = ref(null);
 const account = ref(null);
 const accountLoading = ref(false);
+
+const intakeSummary = ref('');
+function onIntakeCardUpdate(data) {
+    intakeSummary.value = data?.formattedSummary || '';
+}
 
 const technicians = ref([]);
 
@@ -642,6 +655,11 @@ async function submit() {
 
     loading.value = true;
     try {
+        let mergedNotes = (form.notes || '').trim();
+        if (intakeSummary.value && !mergedNotes.includes(intakeSummary.value)) {
+            mergedNotes = mergedNotes ? `${mergedNotes}\n${intakeSummary.value}` : intakeSummary.value;
+        }
+
         const payload = {
             ...form,
             device_type: form.device_type.trim(),
@@ -651,7 +669,7 @@ async function submit() {
             color: form.color || null,
             serial_number: form.serial_number || null,
             accessories: form.accessories || null,
-            notes: form.notes || null,
+            notes: mergedNotes || null,
             final_cost: form.final_cost === '' ? null : form.final_cost,
             delivered_at: isDelivered.value ? form.delivered_at || null : null,
         };

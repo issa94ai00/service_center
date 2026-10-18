@@ -70,6 +70,26 @@
             </div>
         </div>
 
+        <!-- WhatsApp Notification Quick Action -->
+        <div v-if="whatsappUrl" class="rounded-xl border border-emerald-300 bg-emerald-50/70 p-3.5 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <span class="text-2xl">💬</span>
+                <div>
+                    <p class="text-xs font-bold text-emerald-950">إشعار العميل عبر واتساب</p>
+                    <p class="text-[11px] text-emerald-800">إرسال تفاصيل الإيصال والتكلفة إلى {{ repair.customer?.phone }}</p>
+                </div>
+            </div>
+            <a
+                :href="whatsappUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm"
+            >
+                <span>إرسال واتساب</span>
+                <span dir="ltr">↗</span>
+            </a>
+        </div>
+
         <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-between">
             <button
                 type="button"
@@ -113,4 +133,20 @@ const due = computed(() => Number(props.repair.due ?? 0));
 function money(value) {
     return formatMoney(value);
 }
+
+const whatsappUrl = computed(() => {
+    const rawPhone = props.repair.customer?.phone;
+    if (!rawPhone) return null;
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    if (!cleanPhone) return null;
+    const deviceName = [props.repair.brand, props.repair.model].filter(Boolean).join(' ') || props.repair.device_type || 'الجهاز';
+    const receiptNo = props.repair.receipt_no || `#${props.repair.id}`;
+    const est = props.repair.chargeable_cost ? `${formatMoney(props.repair.chargeable_cost)}` : 'قيد الفحص';
+    const msg = `مرحباً بك ${props.repair.customer?.name || 'عميلنا العزيز'}\n` +
+        `تم استلام جهازك (${deviceName}) للصيانة بنجاح.\n` +
+        `رقم الإيصال: ${receiptNo}\n` +
+        `التكلفة التقديرية: ${est}\n` +
+        `سنقوم بإشعارك فور اكتمال الصيانة. شكراً لثقتكم بنا!`;
+    return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+});
 </script>
