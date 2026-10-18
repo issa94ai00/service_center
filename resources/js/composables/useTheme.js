@@ -1,64 +1,111 @@
 import { computed, ref } from 'vue';
 
 /**
- * Light/dark theme for the whole app.
+ * Appearance for the whole app: a light/dark/system mode plus an accent color.
  *
- * The choice lives on <html> as a `dark` class (see @custom-variant dark in
- * app.css) and is remembered in localStorage. State is module-level so every
- * toggle on the page agrees, and an inline script in app.blade.php applies the
- * stored choice before Vue mounts to avoid a flash of the wrong theme.
+ * Dark mode lives on <html> as a `dark` class (see @custom-variant dark in
+ * app.css); the accent lives on <html> as `data-accent`, which remaps the
+ * `--color-blue-*` scale the UI is built on. Both are remembered in
+ * localStorage. State is module-level so every control on the page agrees, and
+ * an inline script in app.blade.php applies the stored choice before Vue mounts
+ * to avoid a flash of the wrong theme.
  */
 
-const STORAGE_KEY = 'theme';
+const MODE_KEY = 'theme';
+const ACCENT_KEY = 'accent';
 const DARK = 'dark';
 const LIGHT = 'light';
+const SYSTEM = 'system';
 
-const theme = ref(readTheme());
+// Keep in step with the html[data-accent] blocks in app.css and the blade script.
+// `bar` is the 950 shade, used for the PWA address bar in light mode.
+export const ACCENTS = [
+    { key: 'blue', label: 'أزرق', swatch: '#2563eb', bar: '#172554' },
+    { key: 'indigo', label: 'نيلي', swatch: '#4f46e5', bar: '#1e1b4b' },
+    { key: 'violet', label: 'بنفسجي', swatch: '#7c3aed', bar: '#2e1065' },
+    { key: 'teal', label: 'فيروزي', swatch: '#0f766e', bar: '#042f2e' },
+    { key: 'emerald', label: 'زمردي', swatch: '#047857', bar: '#022c22' },
+    { key: 'orange', label: 'برتقالي', swatch: '#c2410c', bar: '#431407' },
+];
 
-function prefersDark() {
-    return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+export const MODES = [
+    { key: LIGHT, label: 'فاتح', icon: 'sun' },
+    { key: DARK, label: 'داكن', icon: 'moon' },
+    { key: SYSTEM, label: 'تلقائي', icon: 'monitor' },
+];
+
+const media = typeof window !== 'undefined' ? window.matchMedia?.('(prefers-color-scheme: dark)') : null;
+
+const mode = ref(read(MODE_KEY, [DARK, LIGHT], SYSTEM));
+const accent = ref(read(ACCENT_KEY, ACCENTS.map((a) => a.key), 'blue'));
+const systemDark = ref(!!media?.matches);
+
+const resolved = computed(() => (mode.value === SYSTEM ? (systemDark.value ? DARK : LIGHT) : mode.value));
+
+function read(key, allowed, fallback) {
+    try {
+        const stored = localStorage.getItem(key);
+        if (allowed.includes(stored)) return stored;
+    } catch {
+        // Private window or blocked storage: use the default.
+    }
+    return fallback;
 }
 
-function readTheme() {
+function store(key, value, isDefault) {
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored === DARK || stored === LIGHT) return stored;
+        if (isDefault) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
     } catch {
-        // Private window or blocked storage: fall back to the system preference.
+        // Not fatal: the choice holds for this session.
     }
-    return prefersDark() ? DARK : LIGHT;
 }
 
 function apply() {
     if (typeof document === 'undefined') return;
 
-    document.documentElement.classList.toggle(DARK, theme.value === DARK);
-    document.documentElement.style.colorScheme = theme.value;
+    const root = document.documentElement;
+    const dark = resolved.value === DARK;
+
+    // Switch without every transition on the page animating to the new colors.
+    root.classList.add('theme-switching');
+    root.classList.toggle(DARK, dark);
+    root.style.colorScheme = resolved.value;
+    if (accent.value === 'blue') delete root.dataset.accent;
+    else root.dataset.accent = accent.value;
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
 
     // Keep the PWA address bar in step with the header.
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = theme.value === DARK ? '#020617' : '#172554';
+    if (meta) meta.content = dark ? '#020617' : ACCENTS.find((a) => a.key === accent.value).bar;
 }
+
+media?.addEventListener?.('change', (e) => {
+    systemDark.value = e.matches;
+    if (mode.value === SYSTEM) apply();
+});
 
 // Apply on import too, in case the blade script was skipped.
 apply();
 
 export function useTheme() {
-    const isDark = computed(() => theme.value === DARK);
+    const isDark = computed(() => resolved.value === DARK);
 
-    function setTheme(next) {
-        theme.value = next === DARK ? DARK : LIGHT;
-        try {
-            localStorage.setItem(STORAGE_KEY, theme.value);
-        } catch {
-            // Not fatal: the choice holds for this session.
-        }
+    function setMode(next) {
+        mode.value = [DARK, LIGHT].includes(next) ? next : SYSTEM;
+        store(MODE_KEY, mode.value, mode.value === SYSTEM);
+        apply();
+    }
+
+    function setAccent(next) {
+        accent.value = ACCENTS.some((a) => a.key === next) ? next : 'blue';
+        store(ACCENT_KEY, accent.value, accent.value === 'blue');
         apply();
     }
 
     function toggleTheme() {
-        setTheme(isDark.value ? LIGHT : DARK);
+        setMode(isDark.value ? LIGHT : DARK);
     }
 
-    return { theme, isDark, setTheme, toggleTheme };
+    return { mode, accent, isDark, setMode, setAccent, toggleTheme, setTheme: setMode };
 }

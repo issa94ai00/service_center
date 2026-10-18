@@ -26,16 +26,10 @@
                 </div>
 
                 <div class="flex shrink-0 items-center gap-1.5">
-                    <button
-                        type="button"
-                        class="grid h-9 w-9 place-items-center rounded-lg text-slate-500 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
-                        :title="isDark ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'"
-                        :aria-label="isDark ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'"
-                        :aria-pressed="isDark"
-                        @click="toggleTheme"
-                    >
-                        <AppIcon :name="isDark ? 'sun' : 'moon'" class="text-lg" />
-                    </button>
+                    <ThemeMenu
+                        trigger-class="grid h-9 w-9 place-items-center rounded-lg text-slate-500 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                        icon-class="text-lg"
+                    />
 
                     <AppDropdown panel-class="w-60">
                         <template #trigger="{ toggle, open }">
@@ -101,10 +95,9 @@ import AppIcon from '../../components/ui/AppIcon.vue';
 import ConfirmHost from '../../components/ui/ConfirmHost.vue';
 import ToastHost from '../../components/ui/ToastHost.vue';
 import { usePlatformAdminStore } from '../../stores/platformAdmin';
-import { useTheme } from '../../composables/useTheme';
+import ThemeMenu from '../../components/ui/ThemeMenu.vue';
 
 const store = usePlatformAdminStore();
-const { isDark, toggleTheme } = useTheme();
 const route = useRoute();
 const router = useRouter();
 const host = window.location.host;

@@ -23,8 +23,12 @@
                     var stored = localStorage.getItem('theme');
                     var dark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
                     document.documentElement.classList.toggle('dark', dark);
+                    // Accent color: keep the list and bar colors in step with ACCENTS in useTheme.js.
+                    var bars = { blue: '#172554', indigo: '#1e1b4b', violet: '#2e1065', teal: '#042f2e', emerald: '#022c22', orange: '#431407' };
+                    var accent = localStorage.getItem('accent');
+                    if (bars[accent] && accent !== 'blue') document.documentElement.dataset.accent = accent;
                     var meta = document.querySelector('meta[name="theme-color"]');
-                    if (meta) meta.content = dark ? '#020617' : '#172554';
+                    if (meta) meta.content = dark ? '#020617' : bars[accent] || bars.blue;
                     var loc = localStorage.getItem('locale') || 'ar';
                     document.documentElement.lang = loc;
                     document.documentElement.dir = loc === 'ar' ? 'rtl' : 'ltr';
