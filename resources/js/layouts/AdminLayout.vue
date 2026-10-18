@@ -1,5 +1,5 @@
 <template>
-    <div class="min-h-screen min-h-dvh bg-slate-50">
+    <div class="min-h-screen min-h-dvh bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
         <!-- ------------------------------------------------ Mobile Backdrop -->
         <Transition
             enter-active-class="transition-opacity duration-300 ease-out"
@@ -19,7 +19,7 @@
 
         <!-- ------------------------------------------------ Main Sidebar Aside -->
         <aside
-            class="fixed inset-y-0 right-0 z-50 flex w-72 flex-col bg-gradient-to-b from-blue-950 via-slate-950 to-blue-950 text-slate-100 overflow-hidden shadow-2xl transition-[transform,width] duration-300 ease-in-out lg:translate-x-0"
+            class="fixed inset-y-0 right-0 z-50 flex w-72 flex-col bg-gradient-to-b from-blue-950 via-slate-950 to-blue-950 text-slate-100 overflow-hidden shadow-2xl transition-[transform,width] duration-300 ease-in-out print:hidden lg:translate-x-0"
             :class="[
                 open ? 'translate-x-0' : 'translate-x-full',
                 rail ? 'lg:w-16' : 'lg:w-64',
@@ -345,41 +345,89 @@
 
         <!-- ------------------------------------------------ Main Application Shell -->
         <div
-            class="transition-[padding] duration-300 ease-in-out"
+            class="transition-[padding] duration-300 ease-in-out print:!m-0 print:!p-0"
             :class="contentCollapsed ? 'lg:pr-16' : 'lg:pr-64'"
             :style="{ '--sidebar-w': contentCollapsed ? '4rem' : '16rem' }"
         >
             <!-- App Top Header -->
-            <header class="sticky top-0 z-30 flex h-16 items-center gap-2 border-b sm:gap-4 border-slate-200 bg-white/95 px-4 backdrop-blur-xs lg:px-8">
+            <header
+                class="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-3 backdrop-blur-xs print:hidden sm:gap-3 sm:px-4 lg:px-8"
+            >
                 <!-- Hamburger Menu Button: opens the drawer on mobile, collapses/expands the sidebar on desktop -->
                 <button
                     type="button"
-                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-2xs transition hover:bg-slate-50 focus:ring-2 focus:ring-blue-500/30"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-2xs transition hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                     title="إظهار/إخفاء القائمة الرئيسية"
                     aria-label="إظهار/إخفاء القائمة الرئيسية"
                     :aria-expanded="desktop ? !sidebarCollapsed : open"
                     @click="toggleSidebar"
                 >
-                    ☰
+                    <AppIcon name="menu" class="h-5 w-5" />
                 </button>
 
-                <h1 class="min-w-0 flex-1 truncate text-base font-bold text-slate-900 sm:text-lg">{{ pageTitle }}</h1>
+                <!-- Section breadcrumb (where you are) + page title (what you see) -->
+                <div class="min-w-0 flex-1 leading-tight">
+                    <nav
+                        v-if="sectionCrumb"
+                        class="flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-slate-500 overflow-x-auto whitespace-nowrap no-scrollbar py-0.5"
+                        aria-label="مسار التنقل"
+                    >
+                        <RouterLink to="/dashboard" class="rounded transition hover:text-slate-600 dark:hover:text-slate-300">
+                            الرئيسية
+                        </RouterLink>
+                        <AppIcon name="chevron-left" class="h-3 w-3 shrink-0 text-slate-300 dark:text-slate-600" />
+                        <span class="truncate text-slate-500 dark:text-slate-400">{{ sectionCrumb }}</span>
+                    </nav>
 
-                <div class="ms-auto hidden shrink-0 items-center gap-2 text-xs font-medium text-slate-500 sm:flex sm:text-sm">
-                    <span class="hidden sm:inline" aria-hidden="true">📅</span>
+                    <h1 class="truncate text-base font-bold text-slate-900 dark:text-white sm:text-lg">{{ pageTitle }}</h1>
+                </div>
+
+                <!-- Global search: opens the command palette (Ctrl/⌘ + K) -->
+                <button
+                    type="button"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 shadow-2xs transition hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 md:w-52 md:justify-start md:px-3 lg:w-64 xl:w-72"
+                    title="البحث في النظام (Ctrl + K)"
+                    aria-label="البحث في النظام"
+                    @click="paletteOpen = true"
+                >
+                    <AppIcon name="search" class="h-4.5 w-4.5 shrink-0" />
+                    <span class="hidden min-w-0 flex-1 truncate text-start text-sm md:inline">بحث في النظام...</span>
+                    <kbd
+                        class="hidden shrink-0 items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-slate-500 dark:text-slate-400 lg:inline-flex"
+                    >
+                        <span>Ctrl</span><span>K</span>
+                    </kbd>
+                </button>
+
+                <!-- Appearance: light / dark / system mode and accent color -->
+                <ThemeMenu
+                    trigger-class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-2xs transition hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                />
+
+                <!-- Account menu: profile / print prefs / install / logout -->
+                <AccountMenu />
+
+                <!-- Today's date -->
+                <div
+                    class="hidden h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-medium text-slate-500 dark:text-slate-400 shadow-2xs xl:flex"
+                >
+                    <AppIcon name="calendar" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
                     <span>{{ today }}</span>
                 </div>
             </header>
 
             <!-- Main Page View Container -->
-            <main class="p-4 lg:p-8">
+            <main class="p-4 print:!p-0 print:!m-0 lg:p-8">
                 <RouterView />
             </main>
         </div>
 
-        <ToastHost />
-        <ConfirmHost />
-        <PrintPreferencesHost />
+        <div class="print:hidden">
+            <ToastHost />
+            <ConfirmHost />
+            <PrintPreferencesHost />
+            <CommandPalette v-model:open="paletteOpen" :commands="commands" />
+        </div>
     </div>
 </template>
 
@@ -393,20 +441,30 @@ import ConfirmHost from '../components/ui/ConfirmHost.vue';
 import PrintPreferencesHost from '../components/print/PrintPreferencesHost.vue';
 import { openPrintPreferences } from '../composables/usePrintPreferences';
 import { usePwaInstall } from '../composables/usePwaInstall';
+import { useTheme } from '../composables/useTheme';
+import AppIcon from '../components/ui/AppIcon.vue';
+import AccountMenu from '../components/ui/AccountMenu.vue';
+import CommandPalette from '../components/ui/CommandPalette.vue';
+import ThemeMenu from '../components/ui/ThemeMenu.vue';
 
 const auth = useAuthStore();
 const featuresStore = useFeaturesStore();
 const pwa = usePwaInstall();
+const { isDark, toggleTheme } = useTheme();
 const route = useRoute();
 const router = useRouter();
 const open = ref(false);
 const searchQuery = ref('');
+const paletteOpen = ref(false);
 
 const today = new Intl.DateTimeFormat('ar-SY-u-nu-latn', {
     dateStyle: 'full',
 }).format(new Date());
 
 const pageTitle = computed(() => route.meta.title || 'لوحة التحكم');
+
+/** The sidebar group that owns the current page, shown as breadcrumb context. */
+const sectionCrumb = computed(() => activeSection.value || '');
 
 /**
  * The sidebar sections and links.
@@ -611,6 +669,76 @@ async function logout() {
     await auth.logout();
     router.replace({ name: 'login' });
 }
+
+// ------------------------------------------------------------ Command palette
+
+/**
+ * Everything the command palette can jump to: every visible nav link, plus the
+ * handful of actions that live in the header/sidebar. Each item runs itself, so
+ * the palette stays a dumb list renderer.
+ */
+const commands = computed(() => {
+    const nav = sections.value.flatMap((section) =>
+        section.items.map((item) => ({
+            key: `nav:${item.to}`,
+            label: item.label,
+            group: section.label || 'الرئيسية',
+            emoji: item.icon,
+            keywords: item.to,
+            run: () => router.push(item.to),
+        }))
+    );
+
+    const actions = [
+        {
+            key: 'act:profile',
+            label: 'الملف الشخصي',
+            group: 'إجراءات',
+            icon: 'user',
+            keywords: 'profile حساب بيانات',
+            run: () => router.push('/profile'),
+        },
+        {
+            key: 'act:theme',
+            label: isDark.value ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن',
+            group: 'إجراءات',
+            icon: isDark.value ? 'sun' : 'moon',
+            keywords: 'theme dark light مظهر وضع داكن فاتح',
+            run: toggleTheme,
+        },
+        {
+            key: 'act:print',
+            label: 'تفضيلات الطباعة',
+            group: 'إجراءات',
+            icon: 'printer',
+            keywords: 'print طباعة',
+            run: openPrintPreferences,
+        },
+    ];
+
+    if (!pwa.installed.value) {
+        actions.push({
+            key: 'act:install',
+            label: 'تثبيت التطبيق',
+            group: 'إجراءات',
+            icon: 'download',
+            keywords: 'install pwa تثبيت تطبيق',
+            run: () => pwa.installOrExplain(),
+        });
+    }
+
+    actions.push({
+        key: 'act:logout',
+        label: 'تسجيل الخروج',
+        group: 'إجراءات',
+        icon: 'logout',
+        keywords: 'logout خروج',
+        danger: true,
+        run: logout,
+    });
+
+    return [...nav, ...actions];
+});
 
 // ------------------------------------------------------------ Desktop icon rail
 
@@ -818,6 +946,17 @@ watch(open, (isOpen) => {
 
 // ------------------------------------------------------------ Mobile drawer UX
 function handleKeyDown(e) {
+    // Ctrl/⌘ + K toggles the command palette from anywhere in the app.
+    if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        paletteOpen.value = !paletteOpen.value;
+        return;
+    }
+
+    if (e.key === 'Escape' && paletteOpen.value) {
+        paletteOpen.value = false;
+        return;
+    }
     if (e.key === 'Escape' && peekOpen.value) {
         clearTimeout(peekTimer);
         hovering.value = false;

@@ -20,6 +20,8 @@
 @layer base {
     html {
         color-scheme: light;
+        /* The closed off-canvas sidebar sits just past the right edge; never let it scroll the page sideways. */
+        overflow-x: clip;
     }
     /* RTL by default, but let the English public pages switch with dir="ltr". */
     html:not([dir='ltr']) {
