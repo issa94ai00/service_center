@@ -3,13 +3,14 @@
         <!-- Legend: identity is never carried by the line colour alone. -->
         <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-center gap-4">
-                <span v-for="s in series" :key="s.key" class="flex items-center gap-2 text-xs text-slate-600">
-                    <span class="h-2.5 w-2.5 rounded-full" :style="{ background: s.color }" aria-hidden="true"></span>
+                <span v-for="s in series" :key="s.key" class="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    <span class="h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-900 shadow-xs" :style="{ background: s.color }" aria-hidden="true"></span>
                     {{ s.label }}
                 </span>
             </div>
             <button
-                class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 print:hidden"
+                type="button"
+                class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700/80 transition print:hidden"
                 @click="asTable = !asTable"
             >
                 {{ asTable ? 'عرض الرسم البياني' : 'عرض كجدول' }}
@@ -17,18 +18,18 @@
         </div>
 
         <!-- Table view: the same numbers, always reachable without colour. -->
-        <div v-if="asTable" class="max-h-72 overflow-auto">
+        <div v-if="asTable" class="max-h-72 overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table class="w-full text-right text-sm">
-                <thead class="sticky top-0 bg-slate-50 text-xs font-semibold text-slate-500">
+                <thead class="sticky top-0 bg-slate-50 dark:bg-slate-800/95 text-xs font-semibold text-slate-500 dark:text-slate-400 backdrop-blur-xs">
                     <tr>
-                        <th class="px-3 py-2">الفترة</th>
-                        <th v-for="s in series" :key="s.key" class="px-3 py-2 text-left">{{ s.label }}</th>
+                        <th class="px-3 py-2.5">الفترة</th>
+                        <th v-for="s in series" :key="s.key" class="px-3 py-2.5 text-left">{{ s.label }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 tabular-nums">
-                    <tr v-for="point in points" :key="point.key">
-                        <td class="px-3 py-2 text-slate-600" dir="ltr">{{ point.key }}</td>
-                        <td v-for="s in series" :key="s.key" class="px-3 py-2 text-left text-slate-900">
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 tabular-nums">
+                    <tr v-for="point in points" :key="point.key" class="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 transition">
+                        <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300" dir="ltr">{{ point.key }}</td>
+                        <td v-for="s in series" :key="s.key" class="px-3 py-2.5 text-left font-medium text-slate-900 dark:text-white">
                             {{ formatValue(point[s.key]) }}
                         </td>
                     </tr>
@@ -47,6 +48,14 @@
                 @pointermove="onPointerMove"
                 @pointerleave="hoverIndex = null"
             >
+                <!-- SVG Gradient Defs -->
+                <defs>
+                    <linearGradient v-for="s in series" :key="`grad-${s.key}`" :id="`trend-area-${s.key}`" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" :stop-color="s.color" stop-opacity="0.20" />
+                        <stop offset="90%" :stop-color="s.color" stop-opacity="0.0" />
+                    </linearGradient>
+                </defs>
+
                 <!-- Recessive grid and axis -->
                 <g>
                     <line
@@ -56,7 +65,7 @@
                         :x2="width - pad.right"
                         :y1="tick.y"
                         :y2="tick.y"
-                        stroke="#e2e8f0"
+                        class="stroke-slate-200/80 dark:stroke-slate-800/80"
                         stroke-width="1"
                     />
                     <text
@@ -65,7 +74,7 @@
                         :x="pad.left - 8"
                         :y="tick.y + 4"
                         text-anchor="end"
-                        class="fill-slate-400"
+                        class="fill-slate-400 dark:fill-slate-500 font-medium"
                         style="font-size: 10px"
                     >
                         {{ compact(tick.value) }}
@@ -79,7 +88,7 @@
                         :x="tick.x"
                         :y="height - pad.bottom + 16"
                         text-anchor="middle"
-                        class="fill-slate-400"
+                        class="fill-slate-400 dark:fill-slate-500 font-medium"
                         style="font-size: 10px"
                     >
                         {{ tick.label }}
@@ -93,24 +102,29 @@
                     :x2="xFor(hoverIndex)"
                     :y1="pad.top"
                     :y2="height - pad.bottom"
-                    stroke="#94a3b8"
+                    class="stroke-slate-400 dark:stroke-slate-500"
                     stroke-width="1"
                     stroke-dasharray="3 3"
                 />
 
-                <!-- Series -->
+                <!-- Gradient area fills -->
+                <g v-for="s in series" :key="`area-${s.key}`">
+                    <path :d="areaPathFor(s.key)" :fill="`url(#trend-area-${s.key})`" />
+                </g>
+
+                <!-- Series Lines and Markers -->
                 <g v-for="s in series" :key="`line-${s.key}`">
-                    <path :d="pathFor(s.key)" fill="none" :stroke="s.color" stroke-width="2"
+                    <path :d="pathFor(s.key)" fill="none" :stroke="s.color" stroke-width="2.25"
                         stroke-linejoin="round" stroke-linecap="round" />
-                    <!-- 2px surface ring keeps overlapping markers separable -->
+                    <!-- Surface ring keeps overlapping markers separable -->
                     <circle
                         v-if="hoveredPoint"
                         :cx="xFor(hoverIndex)"
                         :cy="yFor(hoveredPoint[s.key])"
-                        r="5"
+                        r="5.5"
                         :fill="s.color"
-                        stroke="#ffffff"
-                        stroke-width="2"
+                        class="stroke-white dark:stroke-slate-900"
+                        stroke-width="2.5"
                     />
                 </g>
 
@@ -122,7 +136,7 @@
                             :x="label.x - 8"
                             :y="label.labelY - 8"
                             text-anchor="end"
-                            class="fill-slate-500"
+                            class="fill-slate-500 dark:fill-slate-400 font-medium"
                             style="font-size: 10px"
                         >
                             {{ label.label }}
@@ -135,7 +149,7 @@
                     :x="width / 2"
                     :y="height / 2"
                     text-anchor="middle"
-                    class="fill-slate-400"
+                    class="fill-slate-400 dark:fill-slate-500"
                     style="font-size: 12px"
                 >
                     لا توجد حركة في هذه الفترة
@@ -144,17 +158,17 @@
 
             <div
                 v-if="hoveredPoint"
-                class="pointer-events-none absolute z-10 min-w-36 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg"
+                class="pointer-events-none absolute z-10 min-w-40 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3.5 py-2.5 text-xs shadow-xl shadow-slate-900/10 dark:shadow-black/50"
                 :style="tooltipStyle"
                 dir="rtl"
             >
-                <div class="mb-1 font-semibold text-slate-900" dir="ltr">{{ hoveredPoint.key }}</div>
-                <div v-for="s in series" :key="s.key" class="flex items-center justify-between gap-4">
-                    <span class="flex items-center gap-1.5 text-slate-600">
+                <div class="mb-1.5 font-bold text-slate-900 dark:text-white" dir="ltr">{{ hoveredPoint.key }}</div>
+                <div v-for="s in series" :key="s.key" class="flex items-center justify-between gap-4 py-0.5">
+                    <span class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                         <span class="h-2 w-2 rounded-full" :style="{ background: s.color }" aria-hidden="true"></span>
                         {{ s.label }}
                     </span>
-                    <span class="tabular-nums font-medium text-slate-900">{{ formatValue(hoveredPoint[s.key]) }}</span>
+                    <span class="tabular-nums font-bold text-slate-900 dark:text-white">{{ formatValue(hoveredPoint[s.key]) }}</span>
                 </div>
             </div>
         </div>
@@ -279,6 +293,16 @@ function pathFor(key) {
     return props.points
         .map((point, index) => `${index === 0 ? 'M' : 'L'}${xFor(index)},${yFor(point[key])}`)
         .join(' ');
+}
+
+function areaPathFor(key) {
+    if (!props.points.length) return '';
+    const line = pathFor(key);
+    if (!line) return '';
+    const lastX = xFor(props.points.length - 1);
+    const firstX = xFor(0);
+    const bottomY = pad.top + plotHeight.value;
+    return `${line} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
 }
 
 /**
