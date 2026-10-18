@@ -704,6 +704,7 @@ export const documentsApi = {
     repairReceipt: (id, paper) => fetchPdf(`/pdf/repairs/${id}`, { paper }),
     customerStatement: (id, params, paper) => fetchPdf(`/pdf/customers/${id}/statement`, { ...params, paper }),
     supplierStatement: (id, params, paper) => fetchPdf(`/pdf/suppliers/${id}/statement`, { ...params, paper }),
+    technicianStatement: (id, params, paper) => fetchPdf(`/pdf/technicians/${id}/statement`, { ...params, paper }),
     /** A made-up invoice for lining up a printer. */
     sample: (paper) => fetchPdf('/pdf/sample', { paper }),
 };

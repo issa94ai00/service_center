@@ -10,6 +10,7 @@ use App\Models\PurchaseInvoice;
 use App\Models\Repair;
 use App\Models\SalesInvoice;
 use App\Models\Supplier;
+use App\Models\Technician;
 use App\Services\DocumentPdfService;
 use App\Support\PrintSettings;
 use Illuminate\Http\JsonResponse;
@@ -82,6 +83,18 @@ class DocumentPdfController extends Controller
         return $this->stream(
             $this->documents->supplierStatement($supplier, $filters, $this->paper($request, PrintSettings::STATEMENT)),
             $this->filename('supplier-statement', null, $supplier->id),
+        );
+    }
+
+    public function technicianStatement(Request $request, Technician $technician): Response
+    {
+        abort_unless($request->user()?->hasPermission('statements.view'), 403);
+
+        $filters = $this->periodFilters($request);
+
+        return $this->stream(
+            $this->documents->technicianStatement($technician, $filters, $this->paper($request, PrintSettings::STATEMENT)),
+            $this->filename('technician-statement', null, $technician->id),
         );
     }
 

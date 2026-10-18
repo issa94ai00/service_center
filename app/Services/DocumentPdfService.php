@@ -14,6 +14,7 @@ use App\Models\Repair;
 use App\Models\SalesInvoice;
 use App\Models\Setting;
 use App\Models\Supplier;
+use App\Models\Technician;
 use App\Services\Pdf\PdfRenderer;
 use App\Support\ArabicNumberToWords;
 use App\Support\Money;
@@ -251,6 +252,21 @@ class DocumentPdfService
             party: 'المورد',
             owed: 'الرصيد مستحق للمورد',
             prepaid: 'الرصيد لصالحنا',
+        );
+    }
+
+    /**
+     * @param  array{from?: ?string, to?: ?string}  $filters
+     */
+    public function technicianStatement(Technician $technician, array $filters = [], ?PaperSize $paper = null): string
+    {
+        return $this->statement(
+            $this->statements->forTechnician($technician, $this->statementFilters($filters))['statement'],
+            paper: $paper,
+            title: 'كشف حساب خبير صيانة',
+            party: 'خبير الصيانة',
+            owed: 'الرصيد مستحق للخبير',
+            prepaid: 'مصروف زائد عن استحقاقه',
         );
     }
 

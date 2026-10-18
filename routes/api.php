@@ -123,6 +123,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/repairs/{repair}', [DocumentPdfController::class, 'repairReceipt']);
         Route::get('/customers/{customer}/statement', [DocumentPdfController::class, 'customerStatement']);
         Route::get('/suppliers/{supplier}/statement', [DocumentPdfController::class, 'supplierStatement']);
+        Route::get('/technicians/{technician}/statement', [DocumentPdfController::class, 'technicianStatement']);
         Route::get('/sample', [DocumentPdfController::class, 'sample']);
     });
 
