@@ -1,187 +1,185 @@
 <template>
-    <div id="dashboard-sheet" class="space-y-6">
-        <!-- Top Executive Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-4 print:hidden">
-            <div>
-                <div class="flex items-center gap-2.5">
-                    <h2 class="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-                        {{ greeting }}، {{ auth.user?.name }}
-                    </h2>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                        <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden="true"></span>
-                        بيانات حية
+    <div id="dashboard-sheet" class="mx-auto max-w-[1440px] space-y-5">
+        <!-- Header -->
+        <header class="flex flex-wrap items-center justify-between gap-4 print:hidden">
+            <div class="min-w-0">
+                <p class="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    <span>{{ todayLabel }}</span>
+                    <span aria-hidden="true" class="text-slate-300 dark:text-slate-700">•</span>
+                    <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                        <span class="relative flex h-1.5 w-1.5" aria-hidden="true">
+                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+                            <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                        </span>
+                        <template v-if="loadedAt">محدّث {{ loadedAtLabel }}</template>
+                        <template v-else>بيانات حية</template>
                     </span>
-                </div>
-                <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                    <span>{{ periodLabel }}</span>
-                    <span v-if="loadedAt" class="text-xs text-slate-400">· آخر تحديث {{ loadedAtLabel }}</span>
-                </div>
+                </p>
+                <h2 class="mt-1 truncate text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-[1.75rem]">
+                    {{ greeting }}، {{ auth.user?.name }}
+                </h2>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
                 <button
                     v-if="!pwa.installed.value"
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-xs transition hover:bg-blue-100"
+                    :class="btnSecondary"
                     title="تثبيت النظام كتطبيق على هذا الجهاز"
                     @click="pwa.installOrExplain"
                 >
-                    <span aria-hidden="true">📲</span>
-                    <span>تثبيت التطبيق</span>
+                    <AppIcon name="download" class="text-base" />
+                    <span class="hidden sm:inline">تثبيت التطبيق</span>
                 </button>
-
                 <button
                     type="button"
+                    :class="btnIcon"
                     :disabled="loading || refreshing"
-                    class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-blue-600 disabled:opacity-40"
-                    title="تحديث بيانات الشاشة"
+                    :title="refreshing ? 'جارٍ التحديث...' : 'تحديث بيانات الشاشة'"
+                    :aria-label="refreshing ? 'جارٍ التحديث...' : 'تحديث بيانات الشاشة'"
                     @click="refresh"
                 >
-                    <span :class="refreshing ? 'animate-spin' : ''" aria-hidden="true">⟳</span>
-                    <span>{{ refreshing ? 'جارٍ التحديث...' : 'تحديث' }}</span>
+                    <AppIcon name="refresh" class="text-lg" :class="refreshing ? 'animate-spin text-blue-600 dark:text-blue-400' : ''" />
                 </button>
-
                 <button
                     type="button"
+                    :class="btnIcon"
                     :disabled="!data"
-                    class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 disabled:opacity-40"
                     title="طباعة لوحة التحكم"
+                    aria-label="طباعة لوحة التحكم"
                     @click="printSheet"
                 >
-                    <span aria-hidden="true">🖨</span>
-                    <span>طباعة</span>
+                    <AppIcon name="printer" class="text-lg" />
                 </button>
-
                 <RouterLink
                     v-if="can('reports.view')"
                     :to="{ name: 'reports', query: { tab: 'profit', from: filters.from, to: filters.to } }"
-                    class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-xs transition hover:bg-blue-700 hover:shadow-md"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 dark:bg-white px-4 text-sm font-semibold text-white dark:text-slate-900 shadow-sm transition hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-[0.98]"
                 >
-                    <span aria-hidden="true">📊</span>
-                    <span>التقرير المالي المفصل</span>
-                    <span aria-hidden="true" class="text-blue-200">↗</span>
+                    <AppIcon name="chart" class="text-base" />
+                    <span>التقرير المالي</span>
                 </RouterLink>
             </div>
-        </div>
+        </header>
 
-        <!-- Period Control & Navigation Bar -->
-        <div class="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs print:hidden">
-            <!-- Row 1: Presets & Shift navigation -->
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
-                <div class="flex flex-wrap items-center gap-1.5">
-                    <span class="me-1 text-xs font-bold text-slate-400">الفترة:</span>
-                    <button
-                        v-for="preset in presets"
-                        :key="preset.key"
-                        type="button"
-                        class="rounded-full px-3 py-1 text-xs font-semibold transition"
-                        :class="activePreset === preset.key
-                            ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300'
-                            : 'border border-slate-200 bg-slate-50/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
-                        @click="applyPreset(preset)"
-                    >
-                        {{ preset.label }}
-                    </button>
-                </div>
-
-                <!-- Shift period navigation steppers -->
-                <div class="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs transition hover:bg-slate-50 hover:text-blue-600 disabled:opacity-40"
-                        :disabled="loading || refreshing"
-                        title="الانتقال إلى الفترة السابقة بنفس المدة"
-                        @click="shiftPeriod(-1)"
-                    >
-                        <span>◀ الفترة السابقة</span>
-                    </button>
-                    <span class="rounded-md bg-slate-100 px-2 py-0.5 font-bold tabular-nums text-slate-700">
-                        {{ periodDaysCount }} {{ periodDaysCount === 1 ? 'يوم' : periodDaysCount === 2 ? 'يومان' : 'يومًا' }}
-                    </span>
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs transition hover:bg-slate-50 hover:text-blue-600 disabled:opacity-40"
-                        :disabled="loading || refreshing"
-                        title="الانتقال إلى الفترة التالية بنفس المدة"
-                        @click="shiftPeriod(1)"
-                    >
-                        <span>الفترة التالية ▶</span>
-                    </button>
-                </div>
+        <!-- Period toolbar -->
+        <div class="flex flex-wrap items-center gap-2 print:hidden">
+            <div
+                class="no-scrollbar flex min-w-0 max-w-full items-center gap-0.5 overflow-x-auto rounded-xl bg-slate-200/60 dark:bg-slate-800/70 p-1"
+                role="group"
+                aria-label="الفترة"
+            >
+                <button
+                    v-for="preset in presets"
+                    :key="preset.key"
+                    type="button"
+                    class="shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition"
+                    :class="activePreset === preset.key
+                        ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                    :aria-pressed="activePreset === preset.key"
+                    @click="applyPreset(preset)"
+                >
+                    {{ preset.label }}
+                </button>
             </div>
 
-            <!-- Row 2: Custom Date Pickers & Action Buttons -->
-            <div class="mt-3.5 flex flex-wrap items-end justify-between gap-4">
-                <div class="flex flex-wrap items-end gap-3">
-                    <label class="text-xs font-bold text-slate-600">
-                        من تاريخ
+            <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <div class="flex w-full min-w-0 items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xs sm:w-auto">
+                    <button
+                        type="button"
+                        class="grid h-9 w-9 place-items-center rounded-s-xl text-slate-500 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white disabled:opacity-40"
+                        :disabled="loading || refreshing"
+                        title="الانتقال إلى الفترة السابقة بنفس المدة"
+                        aria-label="الفترة السابقة"
+                        @click="shiftPeriod(-1)"
+                    >
+                        <AppIcon name="chevron-right" class="text-base ltr:rotate-180" />
+                    </button>
+                    <AppIcon name="calendar" class="hidden shrink-0 text-base text-slate-400 sm:block" />
+                    <label class="flex min-w-0 flex-1 items-center px-1">
+                        <span class="sr-only">من تاريخ</span>
                         <input
                             v-model="filters.from"
                             type="date"
-                            class="mt-1 block rounded-xl border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            class="w-full min-w-0 rounded-md bg-transparent sm:w-[8.4rem] px-1.5 py-1.5 text-[13px] font-semibold tabular-nums text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                             @keyup.enter="applyFilters"
                         />
                     </label>
-
-                    <label class="text-xs font-bold text-slate-600">
-                        إلى تاريخ
+                    <span class="text-slate-300 dark:text-slate-600" aria-hidden="true">–</span>
+                    <label class="flex min-w-0 flex-1 items-center px-1">
+                        <span class="sr-only">إلى تاريخ</span>
                         <input
                             v-model="filters.to"
                             type="date"
                             :min="filters.from || undefined"
-                            class="mt-1 block rounded-xl border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm font-medium text-slate-900 shadow-2xs transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            class="w-full min-w-0 rounded-md bg-transparent sm:w-[8.4rem] px-1.5 py-1.5 text-[13px] font-semibold tabular-nums text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                             @keyup.enter="applyFilters"
                         />
                     </label>
-
-                    <div class="flex items-center gap-2 pb-0.5">
-                        <button
-                            type="button"
-                            :disabled="rangeInvalid"
-                            class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-xs transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-                            :class="dirty && !rangeInvalid ? 'ring-3 ring-blue-300 animate-pulse' : ''"
-                            @click="applyFilters"
-                        >
-                            <span>تطبيق الفلترة</span>
-                        </button>
-
-                        <button
-                            v-if="canReset"
-                            type="button"
-                            class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 shadow-xs transition hover:bg-slate-50 hover:text-slate-900"
-                            @click="resetFilters"
-                        >
-                            إعادة تعيين
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        class="grid h-9 w-9 place-items-center rounded-e-xl text-slate-500 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white disabled:opacity-40"
+                        :disabled="loading || refreshing"
+                        title="الانتقال إلى الفترة التالية بنفس المدة"
+                        aria-label="الفترة التالية"
+                        @click="shiftPeriod(1)"
+                    >
+                        <AppIcon name="chevron-left" class="text-base ltr:rotate-180" />
+                    </button>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <span v-if="rangeInvalid" class="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600" role="alert">
-                        ⚠️ تاريخ البداية بعد تاريخ النهاية
-                    </span>
-                    <span v-else-if="dirty" class="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                        ⚡ هناك تعديلات في التواريخ بانتظار التطبيق
-                    </span>
-                </div>
+                <span class="rounded-lg px-1.5 text-xs font-bold tabular-nums text-slate-500 dark:text-slate-400">
+                    {{ periodDaysCount }} {{ periodDaysCount === 1 ? 'يوم' : periodDaysCount === 2 ? 'يومان' : 'يومًا' }}
+                </span>
+
+                <button
+                    v-if="dirty || rangeInvalid"
+                    type="button"
+                    :disabled="rangeInvalid"
+                    class="h-9 rounded-xl bg-blue-600 px-4 text-[13px] font-bold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
+                    @click="applyFilters"
+                >
+                    تطبيق
+                </button>
+                <button
+                    v-if="canReset"
+                    type="button"
+                    class="h-9 rounded-xl px-3 text-[13px] font-medium text-slate-500 dark:text-slate-400 transition hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                    @click="resetFilters"
+                >
+                    إعادة تعيين
+                </button>
             </div>
+
+            <p v-if="rangeInvalid" class="flex w-full items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400" role="alert">
+                <AppIcon name="alert" /> تاريخ البداية بعد تاريخ النهاية
+            </p>
+            <p v-else-if="dirty" class="w-full text-xs font-semibold text-blue-600 dark:text-blue-400">
+                هناك تعديلات في التواريخ بانتظار التطبيق
+            </p>
         </div>
 
-        <!-- Quick Action Cards (Daily Workflow) -->
-        <div v-if="quickActions.length" class="flex flex-wrap items-center gap-2.5 print:hidden">
+        <!-- Quick actions -->
+        <nav v-if="quickActions.length" class="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 print:hidden" aria-label="إجراءات سريعة">
             <RouterLink
-                v-for="(action, index) in quickActions"
+                v-for="action in quickActions"
                 :key="action.label"
                 :to="action.to"
-                class="group inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition shadow-xs"
+                class="group inline-flex shrink-0 items-center gap-2 rounded-full border py-1.5 pe-4 ps-1.5 text-[13px] font-semibold transition"
                 :class="action.primary
-                    ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50 hover:text-blue-600'"
+                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/25 hover:bg-blue-700'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'"
             >
-                <span class="text-sm transition group-hover:scale-110" aria-hidden="true">{{ action.icon }}</span>
-                <span>{{ action.label }}</span>
+                <span
+                    class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[14px] transition group-hover:scale-105"
+                    :class="action.primary ? 'bg-white/20 text-white' : action.tone"
+                >
+                    <AppIcon :name="action.primary ? 'plus' : action.icon" />
+                </span>
+                <span class="whitespace-nowrap">{{ action.label }}</span>
             </RouterLink>
-        </div>
+        </nav>
 
         <!-- Print-only Header Sheet -->
         <div class="hidden border-b border-slate-200 pb-3 print:block">
@@ -190,543 +188,348 @@
             <p class="mt-0.5 text-[11px] text-slate-500">طُبع في {{ printedAt }}</p>
         </div>
 
-        <!-- Error Banner -->
+        <!-- Error -->
         <div
             v-if="error"
-            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 shadow-xs"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 p-4 text-sm font-semibold text-red-700 dark:text-red-400"
         >
             <div class="flex items-center gap-2">
-                <span class="text-lg">⚠️</span>
+                <AppIcon name="alert" class="text-lg" />
                 <span>{{ error }}</span>
             </div>
             <button
                 type="button"
-                class="rounded-lg border border-red-300 bg-white px-3.5 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100 print:hidden"
+                class="rounded-xl border border-red-300 dark:border-red-800 bg-white dark:bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-red-700 dark:text-red-400 transition hover:bg-red-100 dark:hover:bg-red-950 print:hidden"
                 @click="load"
             >
                 إعادة المحاولة
             </button>
         </div>
 
-        <!-- Skeleton Loading -->
         <DashboardSkeleton v-if="loading && !data" />
 
-        <!-- Main Dashboard Content -->
         <div
             v-else-if="data"
-            class="space-y-6 transition-opacity"
-            :class="refreshing ? 'opacity-50 pointer-events-none' : ''"
+            class="grid gap-4 transition-opacity lg:grid-cols-12"
+            :class="refreshing ? 'pointer-events-none opacity-50' : ''"
             :aria-busy="refreshing"
         >
-            <!-- Operational Alerts Bar -->
-            <div v-if="activeAlerts.length" class="flex flex-wrap items-center gap-2.5">
+            <!-- Needs attention -->
+            <div v-if="activeAlerts.length" class="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 lg:col-span-12">
+                <span class="flex shrink-0 items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
+                    <AppIcon name="alert" class="text-amber-500" />
+                    تحتاج انتباهك
+                </span>
                 <RouterLink
                     v-for="alert in activeAlerts"
                     :key="alert.label"
                     :to="alert.to"
-                    class="group inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition shadow-xs"
-                    :class="alert.tone"
+                    class="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 py-1 pe-1 ps-3 text-[13px] font-semibold text-slate-700 dark:text-slate-300 transition hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white"
                 >
-                    <span class="text-base transition group-hover:scale-110" aria-hidden="true">{{ alert.icon }}</span>
-                    <span>{{ alert.label }}</span>
-                    <span class="rounded-full bg-white/80 px-2 py-0.5 text-xs font-black tabular-nums shadow-2xs ring-1 ring-black/5">
+                    <AppIcon :name="alert.icon" class="text-[15px]" :class="alert.iconTone" />
+                    <span class="whitespace-nowrap">{{ alert.label }}</span>
+                    <span class="grid h-6 min-w-6 place-items-center rounded-full px-2 text-xs font-extrabold tabular-nums" :class="alert.countTone">
                         {{ alert.count }}
                     </span>
                 </RouterLink>
             </div>
 
-            <!-- Executive Cockpit (Dual Hero Cards) -->
-            <div class="grid gap-5 lg:grid-cols-2">
-                <!-- Hero Card 1: صافي المركز المالي التراكمي -->
-                <div class="dashboard-hero relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-white shadow-xl shadow-slate-950/20 sm:p-7">
-                    <div class="hero-blob pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full bg-blue-500/20 blur-3xl" aria-hidden="true" />
-                    <div class="hero-blob pointer-events-none absolute -start-12 -bottom-24 h-52 w-52 rounded-full bg-indigo-500/20 blur-3xl" aria-hidden="true" />
+            <!-- Period profit -->
+            <section class="dash-card dashboard-hero relative isolate overflow-hidden rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-6 lg:col-span-8">
+                <div class="hero-glow pointer-events-none absolute -end-32 -top-40 -z-10 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-500/15" aria-hidden="true"></div>
 
-                    <div class="relative flex items-center justify-between gap-4">
-                        <div class="flex items-center gap-3.5">
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl ring-1 ring-white/15" aria-hidden="true">
-                                ⚖️
-                            </span>
-                            <div>
-                                <div class="text-xs font-semibold tracking-wide text-blue-200/80">صافي المركز المالي العام</div>
-                                <div class="text-[11px] text-slate-400">إجمالي الأرصدة التراكمية (الذمم)</div>
-                            </div>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-500 dark:text-slate-400">صافي الربح التقديري</p>
+                        <p class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500" dir="ltr">{{ data.period.from }} → {{ data.period.to }}</p>
+                    </div>
+                    <span
+                        v-if="data.profit_overview"
+                        class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+                        :class="data.profit_overview.is_loss
+                            ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'"
+                    >
+                        <AppIcon :name="data.profit_overview.is_loss ? 'trending-down' : 'trending-up'" />
+                        هامش {{ data.profit_overview.net_margin }}٪
+                    </span>
+                </div>
+
+                <div class="mt-4 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+                    <p
+                        class="min-w-0 break-words text-4xl font-extrabold tabular-nums tracking-tight sm:text-5xl"
+                        :class="data.profit_overview?.is_loss ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'"
+                    >
+                        {{ formatUsd(data.profit_overview?.net_profit ?? tradeMargin) }}
+                    </p>
+
+                    <dl class="flex gap-6 text-sm">
+                        <div>
+                            <dt class="text-xs text-slate-500 dark:text-slate-400">الإيرادات</dt>
+                            <dd class="mt-0.5 font-bold tabular-nums text-slate-900 dark:text-white">{{ formatUsd(data.profit_overview?.revenue ?? data.kpis.sales_period.amount) }}</dd>
                         </div>
-                        <span class="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
-                            الوضع الراهن
+                        <div>
+                            <dt class="text-xs text-slate-500 dark:text-slate-400">مجمل الربح</dt>
+                            <dd class="mt-0.5 font-bold tabular-nums text-slate-900 dark:text-white">
+                                {{ formatUsd(data.profit_overview?.gross_profit ?? tradeMargin) }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-slate-500 dark:text-slate-400">التدفق النقدي</dt>
+                            <dd class="mt-0.5 font-bold tabular-nums" :class="netCashFlow < 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'">
+                                {{ formatUsd(netCashFlow) }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="mt-6 border-t border-slate-100 dark:border-slate-800 pt-5">
+                    <ProfitBreakdown v-if="data.profit_overview" :overview="data.profit_overview" />
+                </div>
+            </section>
+
+            <!-- Overall position -->
+            <section class="dash-card flex flex-col justify-between rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-6 lg:col-span-4">
+                <div>
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-slate-500 dark:text-slate-400">صافي المركز المالي</p>
+                        <span class="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            <AppIcon name="scale" />
                         </span>
                     </div>
+                    <p
+                        class="mt-3 break-words text-3xl font-extrabold tabular-nums tracking-tight sm:text-[2.1rem]"
+                        :class="Number(data.kpis.net_position) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'"
+                    >
+                        {{ formatUsd(data.kpis.net_position) }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">الذمم المستحقة لنا ناقص المستحقة علينا، حتى اليوم</p>
+                </div>
 
-                    <div class="relative mt-4">
-                        <div
-                            class="break-words text-3xl font-black tabular-nums sm:text-4xl lg:text-3xl xl:text-4xl"
-                            :class="Number(data.kpis.net_position) < 0 ? 'text-red-300' : 'text-emerald-300'"
-                        >
-                            {{ formatUsd(data.kpis.net_position) }}
-                        </div>
+                <div class="mt-6">
+                    <div class="position-track flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden="true">
+                        <div class="h-full rounded-s-full bg-emerald-500 transition-all duration-500" :style="{ width: `${positionSplit.receivables}%` }"></div>
+                        <div class="h-full rounded-e-full bg-amber-400 transition-all duration-500" :style="{ width: `${positionSplit.payables}%` }"></div>
                     </div>
-
-                    <!-- Split Progress Bar -->
-                    <div class="relative mt-5">
-                        <div class="position-track flex h-2.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
-                            <div class="h-full bg-emerald-400 transition-all duration-500" :style="{ width: `${positionSplit.receivables}%` }"></div>
-                            <div class="h-full bg-amber-400 transition-all duration-500" :style="{ width: `${positionSplit.payables}%` }"></div>
-                        </div>
-
-                        <div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
-                            <component
-                                :is="can('reports.view') ? RouterLink : 'span'"
-                                :to="can('reports.view') ? { name: 'reports', query: { tab: 'receivables' } } : undefined"
-                                class="flex items-center gap-2 text-slate-300"
-                                :class="can('reports.view') ? 'transition hover:text-white hover:underline' : ''"
-                            >
-                                <span class="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true"></span>
-                                <span>مستحق لنا (عملاء):</span>
-                                <b class="tabular-nums font-bold text-white">{{ formatUsd(data.kpis.receivables) }}</b>
-                            </component>
-
-                            <component
-                                :is="can('reports.view') ? RouterLink : 'span'"
-                                :to="can('reports.view') ? { name: 'reports', query: { tab: 'payables' } } : undefined"
-                                class="flex items-center gap-2 text-slate-300"
-                                :class="can('reports.view') ? 'transition hover:text-white hover:underline' : ''"
-                            >
+                    <div class="mt-4 grid grid-cols-2 gap-2">
+                        <component
+                            :is="can('reports.view') ? RouterLink : 'div'"
+                            :to="can('reports.view') ? { name: 'reports', query: { tab: 'receivables' } } : undefined"
+                            class="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3 transition"
+                            :class="can('reports.view') ? 'hover:bg-slate-100 dark:hover:bg-slate-800' : ''"
+                        >
+                            <span class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                                لنا (عملاء)
+                            </span>
+                            <span class="mt-1 block truncate text-[15px] font-bold tabular-nums text-slate-900 dark:text-white">{{ formatUsd(data.kpis.receivables) }}</span>
+                        </component>
+                        <component
+                            :is="can('reports.view') ? RouterLink : 'div'"
+                            :to="can('reports.view') ? { name: 'reports', query: { tab: 'payables' } } : undefined"
+                            class="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3 transition"
+                            :class="can('reports.view') ? 'hover:bg-slate-100 dark:hover:bg-slate-800' : ''"
+                        >
+                            <span class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                                 <span class="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true"></span>
-                                <span>مستحق علينا (موردون):</span>
-                                <b class="tabular-nums font-bold text-white">{{ formatUsd(data.kpis.payables) }}</b>
-                            </component>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Hero Card 2: نبض الأرباح والسيولة للفترة المحددة -->
-                <div class="dashboard-hero relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-900 p-6 text-white shadow-xl shadow-indigo-950/20 sm:p-7">
-                    <div class="hero-blob pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full bg-cyan-400/20 blur-3xl" aria-hidden="true" />
-                    <div class="hero-blob pointer-events-none absolute -start-12 -bottom-24 h-52 w-52 rounded-full bg-blue-400/20 blur-3xl" aria-hidden="true" />
-
-                    <div class="relative flex items-center justify-between gap-4">
-                        <div class="flex items-center gap-3.5">
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl ring-1 ring-white/15" aria-hidden="true">
-                                💰
+                                علينا (موردون)
                             </span>
-                            <div>
-                                <div class="text-xs font-semibold tracking-wide text-cyan-200/80">أداء الفترة المحددة</div>
-                                <div class="text-[11px] text-slate-400">{{ data.period.from }} — {{ data.period.to }} ({{ data.period.days }} يومًا)</div>
-                            </div>
-                        </div>
-
-                        <span
-                            v-if="data.profit_overview"
-                            class="rounded-full px-2.5 py-0.5 text-xs font-bold"
-                            :class="data.profit_overview.is_loss ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/20 text-emerald-300'"
-                        >
-                            {{ data.profit_overview.is_loss ? 'صافي خسارة' : 'صافي ربح' }}
-                            {{ data.profit_overview.net_margin }}٪
-                        </span>
-                    </div>
-
-                    <div class="relative mt-4 flex flex-wrap items-baseline justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="text-xs text-slate-300">صافي الربح التقديري للفترة</div>
-                            <div
-                                class="mt-0.5 break-words text-3xl font-black tabular-nums sm:text-4xl lg:text-3xl xl:text-4xl"
-                                :class="data.profit_overview?.is_loss ? 'text-red-300' : 'text-emerald-300'"
-                            >
-                                {{ formatUsd(data.profit_overview?.net_profit ?? tradeMargin) }}
-                            </div>
-                        </div>
-
-                        <div class="text-start sm:text-end">
-                            <div class="text-xs text-slate-300">صافي التدفق النقدي</div>
-                            <div
-                                class="mt-0.5 text-xl font-bold tabular-nums"
-                                :class="Number(data.profit_overview?.net_cash_flow ?? 0) < 0 ? 'text-amber-300' : 'text-cyan-300'"
-                            >
-                                {{ formatUsd(data.profit_overview?.net_cash_flow ?? ((Number(data.kpis.collected_period) || 0) - (Number(data.kpis.paid_period) || 0))) }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Mini Key Figures Grid -->
-                    <div class="relative mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-3 text-xs sm:grid-cols-3">
-                        <div>
-                            <span class="block text-slate-400">إجمالي المبيعات</span>
-                            <span class="font-bold tabular-nums text-white">{{ formatUsd(data.kpis.sales_period.amount) }}</span>
-                        </div>
-                        <div>
-                            <span class="block text-slate-400">إجمالي المشتريات</span>
-                            <span class="font-bold tabular-nums text-white">{{ formatUsd(data.kpis.purchases_period.amount) }}</span>
-                        </div>
-                        <div class="col-span-2 sm:col-span-1">
-                            <span class="block text-slate-400">مصاريف التشغيل</span>
-                            <span class="font-bold tabular-nums text-rose-300">{{ formatUsd(data.kpis.expenses_period.amount) }}</span>
-                        </div>
+                            <span class="mt-1 block truncate text-[15px] font-bold tabular-nums text-slate-900 dark:text-white">{{ formatUsd(data.kpis.payables) }}</span>
+                        </component>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- KPI Category Filter Pills -->
-            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-xs font-bold text-slate-400">عرض المؤشرات:</span>
-                    <button
-                        type="button"
-                        class="rounded-lg px-3 py-1 text-xs font-bold transition"
-                        :class="kpiCategory === 'all'
-                            ? 'bg-slate-900 text-white'
-                            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'"
-                        @click="kpiCategory = 'all'"
-                    >
-                        الكل ({{ allKpiCount }})
-                    </button>
-                    <button
-                        type="button"
-                        class="rounded-lg px-3 py-1 text-xs font-bold transition"
-                        :class="kpiCategory === 'finance'
-                            ? 'bg-blue-600 text-white'
-                            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'"
-                        @click="kpiCategory = 'finance'"
-                    >
-                        💰 الحركة المالية والتجارية ({{ kpiCards.length }})
-                    </button>
-                    <button
-                        v-if="workshopKpis.length"
-                        type="button"
-                        class="rounded-lg px-3 py-1 text-xs font-bold transition"
-                        :class="kpiCategory === 'workshop'
-                            ? 'bg-indigo-600 text-white'
-                            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'"
-                        @click="kpiCategory = 'workshop'"
-                    >
-                        🔧 ورشة الصيانة والأجهزة ({{ workshopKpis.length }})
-                    </button>
-                </div>
-            </div>
-
-            <!-- Financial KPIs Row -->
-            <div v-if="kpiCategory === 'all' || kpiCategory === 'finance'" class="space-y-3">
-                <div v-if="kpiCategory === 'all'" class="flex items-center gap-2 text-xs font-bold text-slate-500">
-                    <span>💰 الحركة المالية والتجارية في الفترة</span>
-                </div>
-                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <!-- KPI strip: one card, cells split by hairlines -->
+            <section class="dash-card overflow-hidden rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:col-span-12" aria-label="المؤشرات الرئيسية">
+                <div class="-mb-px -me-px grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6">
                     <StatCard
                         v-for="card in kpiCards"
                         :key="card.label"
-                        :label="card.label"
-                        :value="card.value"
-                        :hint="card.hint"
-                        :icon="card.icon"
-                        :icon-class="card.iconClass"
-                        :tone="card.tone"
-                        :to="card.to"
-                        :delta="card.delta"
-                        :good-when="card.goodWhen"
+                        v-bind="card"
                         :previous-label="comparisonLabel"
+                        class="border-b border-e border-slate-100 dark:border-slate-800"
                     />
                 </div>
-            </div>
+            </section>
 
-            <!-- Workshop KPIs Row -->
-            <div v-if="(kpiCategory === 'all' || kpiCategory === 'workshop') && workshopKpis.length" class="space-y-3">
-                <div v-if="kpiCategory === 'all'" class="flex items-center gap-2 text-xs font-bold text-slate-500">
-                    <span>🔧 ورشة الصيانة والأجهزة</span>
-                </div>
-                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard
-                        v-for="card in workshopKpis"
-                        :key="card.label"
-                        :label="card.label"
-                        :value="card.value"
-                        :hint="card.hint"
-                        :icon="card.icon"
-                        :icon-class="card.iconClass"
-                        :tone="card.tone"
-                        :to="card.to"
-                    />
-                </div>
-            </div>
-
-            <!-- Trend Section: Sales vs Purchases -->
-            <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                <div class="mb-2 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                    <div>
-                        <h3 class="font-bold text-slate-900 sm:text-base">حركة المبيعات والمشتريات خلال الفترة</h3>
-                        <p class="mt-0.5 text-xs text-slate-500">تتبع يومي/شهري لتطور الإيرادات والمشتريات</p>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-3 text-xs">
-                        <span class="rounded-lg bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">
-                            {{ data.trend.granularity === 'day' ? 'تدرّج يومي' : 'تدرّج شهري' }}
-                        </span>
-                        <span class="text-slate-400" dir="ltr">{{ data.period.from }} — {{ data.period.to }}</span>
-                    </div>
-                </div>
-
-                <!-- Trend Summary Pills -->
-                <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
-                    <span class="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 font-medium text-blue-800">
-                        <span class="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true"></span>
-                        المبيعات: <b class="tabular-nums font-bold">{{ formatUsd(data.kpis.sales_period.amount) }}</b>
+            <!-- Trend -->
+            <DashCard
+                title="حركة المبيعات والمشتريات"
+                :subtitle="`الفارق التجاري ${formatUsd(tradeMargin)}`"
+                icon="chart"
+                tone="bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400"
+                class="lg:col-span-8"
+            >
+                <template #actions>
+                    <span class="shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800 px-2 py-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+                        {{ data.trend.granularity === 'day' ? 'يومي' : 'شهري' }}
                     </span>
-                    <span class="flex items-center gap-1.5 rounded-lg bg-orange-50 px-3 py-1.5 font-medium text-orange-800">
-                        <span class="h-2 w-2 rounded-full bg-orange-600" aria-hidden="true"></span>
-                        المشتريات: <b class="tabular-nums font-bold">{{ formatUsd(data.kpis.purchases_period.amount) }}</b>
-                    </span>
-                    <span
-                        class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium"
-                        :class="tradeMargin < 0 ? 'bg-red-50 text-red-800' : 'bg-emerald-50 text-emerald-800'"
-                    >
-                        الفارق التجاري: <b class="tabular-nums font-bold">{{ formatUsd(tradeMargin) }}</b>
-                    </span>
-                </div>
-
+                </template>
                 <TrendChart :points="data.trend.points" :series="trendSeries" :format-value="formatUsd" />
-            </div>
+            </DashCard>
 
-            <!-- Rankings Section: Top Customers, Top Materials, and the module sections the user may see -->
-            <div class="grid gap-5" :class="rankingGridClass">
-                <!-- Top customers -->
-                <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                    <div class="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">👥</span>
-                            <h3 class="font-bold text-slate-900">أعلى العملاء في الفترة</h3>
-                        </div>
-                        <RouterLink
-                            v-if="can('customers.view')"
-                            :to="{ name: 'customers' }"
-                            class="text-xs font-semibold text-blue-600 hover:underline"
-                        >
-                            دليل العملاء ↗
-                        </RouterLink>
-                    </div>
-                    <RankedList
-                        :rows="topCustomers"
-                        empty-icon="👥"
-                        empty-title="لا توجد مبيعات مسجلة"
-                        empty-hint="جرّب توسيع نطاق الفترة"
-                    />
+            <!-- Workshop -->
+            <DashCard
+                v-if="data.workshop"
+                title="ورشة الصيانة"
+                subtitle="الوضع الحالي للأجهزة"
+                icon="wrench"
+                tone="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400"
+                :to="can('repairs.view') ? { name: 'repairs' } : null"
+                link-label="الصيانة"
+                class="lg:col-span-4"
+            >
+                <WorkshopPipeline :workshop="data.workshop" :linkable="can('repairs.view')" />
+            </DashCard>
+
+            <!-- Rankings: one card, a tab per list -->
+            <DashCard
+                title="الأعلى في الفترة"
+                icon="trending-up"
+                tone="bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-400"
+                :to="currentRanking.to"
+                :link-label="currentRanking.linkLabel"
+                :class="data.workshop ? 'lg:col-span-6 xl:col-span-4' : 'lg:order-1 lg:col-span-7'"
+            >
+                <div class="no-scrollbar -mx-1 mb-4 flex gap-1 overflow-x-auto px-1" role="tablist" aria-label="القوائم">
+                    <button
+                        v-for="tab in rankingTabs"
+                        :key="tab.key"
+                        type="button"
+                        role="tab"
+                        class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
+                        :class="currentRanking.key === tab.key
+                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                        :aria-selected="currentRanking.key === tab.key"
+                        @click="rankingTab = tab.key"
+                    >
+                        {{ tab.label }}
+                    </button>
+                </div>
+                <RankedList
+                    :rows="currentRanking.rows"
+                    :color="currentRanking.color"
+                    :empty-icon="currentRanking.emptyIcon"
+                    :empty-title="currentRanking.emptyTitle"
+                    empty-hint="جرّب توسيع نطاق الفترة"
+                />
+                <p
+                    v-if="currentRanking.key === 'technicians'"
+                    class="mt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 text-xs text-slate-500 dark:text-slate-400"
+                >
+                    <span>مستحقات قائمة للخبراء النشطين</span>
+                    <b class="tabular-nums text-slate-800 dark:text-slate-200">{{ formatUsd(data.top_technicians.balance_owed) }}</b>
+                </p>
+            </DashCard>
+
+            <!-- Recent activity -->
+            <DashCard
+                title="آخر الحركات"
+                icon="clock"
+                :class="data.workshop ? 'lg:col-span-6 xl:col-span-4' : 'lg:order-1 lg:col-span-5'"
+            >
+                <div class="no-scrollbar -mx-1 mb-3 flex gap-1 overflow-x-auto px-1">
+                    <button
+                        v-for="rf in recentFilters"
+                        :key="rf.key"
+                        type="button"
+                        class="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition"
+                        :class="recentFilter === rf.key
+                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'"
+                        :aria-pressed="recentFilter === rf.key"
+                        @click="recentFilter = rf.key"
+                    >
+                        {{ rf.label }}
+                    </button>
                 </div>
 
-                <!-- Top materials -->
-                <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                    <div class="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">📦</span>
-                            <h3 class="font-bold text-slate-900">أعلى المواد مبيعًا</h3>
-                        </div>
-                        <RouterLink
-                            v-if="can('inventory.view')"
-                            :to="{ name: 'inventory' }"
-                            class="text-xs font-semibold text-purple-600 hover:underline"
-                        >
-                            المخزون ↗
-                        </RouterLink>
-                    </div>
-                    <RankedList
-                        :rows="topMaterials"
-                        color="#7c3aed"
-                        empty-icon="📦"
-                        empty-title="لا توجد مواد مباعة"
-                        empty-hint="جرّب توسيع نطاق الفترة"
-                    />
-                </div>
-
-                <!-- Top Workshop Brands (If available) -->
-                <div v-if="topBrands.length" class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                    <div class="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">🔧</span>
-                            <h3 class="font-bold text-slate-900">أكثر أجهزة الصيانة بالورشة</h3>
-                        </div>
-                        <RouterLink
-                            v-if="can('repairs.view')"
-                            :to="{ name: 'repairs' }"
-                            class="text-xs font-semibold text-indigo-600 hover:underline"
-                        >
-                            الصيانة ↗
-                        </RouterLink>
-                    </div>
-                    <RankedList
-                        :rows="topBrands"
-                        color="#4f46e5"
-                        empty-icon="🔧"
-                        empty-title="لا توجد أجهزة مستلمة"
-                        empty-hint="جرّب توسيع نطاق الفترة"
-                    />
-                </div>
-
-                <!-- Top technicians (technicians.view) -->
-                <div v-if="data.top_technicians" class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                    <div class="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">🧰</span>
-                            <h3 class="font-bold text-slate-900">عمولات خبراء الصيانة</h3>
-                        </div>
-                        <RouterLink
-                            :to="{ name: 'technicians' }"
-                            class="text-xs font-semibold text-teal-600 hover:underline"
-                        >
-                            الخبراء ↗
-                        </RouterLink>
-                    </div>
-                    <RankedList
-                        :rows="topTechnicians"
-                        color="#0d9488"
-                        empty-icon="🧰"
-                        empty-title="لا توجد أجهزة مسوّاة لخبراء"
-                        empty-hint="جرّب توسيع نطاق الفترة"
-                    />
-                    <p class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
-                        <span>مستحقات قائمة للخبراء النشطين</span>
-                        <b class="tabular-nums text-slate-800">{{ formatUsd(data.top_technicians.balance_owed) }}</b>
-                    </p>
-                </div>
-
-                <!-- Top services (services.view) -->
-                <div v-if="data.top_services" class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                    <div class="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">🛠️</span>
-                            <h3 class="font-bold text-slate-900">أكثر الخدمات مبيعًا</h3>
-                        </div>
-                        <RouterLink
-                            :to="{ name: 'services' }"
-                            class="text-xs font-semibold text-sky-600 hover:underline"
-                        >
-                            دليل الخدمات ↗
-                        </RouterLink>
-                    </div>
-                    <RankedList
-                        :rows="topServices"
-                        color="#0284c7"
-                        empty-icon="🛠️"
-                        empty-title="لا توجد خدمات مباعة"
-                        empty-hint="جرّب توسيع نطاق الفترة"
-                    />
-                </div>
-            </div>
-
-            <!-- Bottom Row: Recent activity & Low stock watchlist -->
-            <div class="grid gap-5 lg:grid-cols-2">
-                <!-- Recent activity stream with tabs -->
-                <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                    <div class="mb-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">⚡</span>
-                            <h3 class="font-bold text-slate-900">آخر الحركات المعتمدة</h3>
-                        </div>
-
-                        <!-- Type filters -->
-                        <div class="flex flex-wrap items-center gap-1">
-                            <button
-                                v-for="rf in recentFilters"
-                                :key="rf.key"
-                                type="button"
-                                class="rounded-md px-2 py-0.5 text-[11px] font-semibold transition"
-                                :class="recentFilter === rf.key
-                                    ? 'bg-slate-900 text-white'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                                @click="recentFilter = rf.key"
-                            >
-                                {{ rf.label }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <ul v-if="filteredRecentDocuments.length" class="divide-y divide-slate-100">
-                        <li
-                            v-for="doc in filteredRecentDocuments"
-                            :key="`${doc.kind}-${doc.id}`"
-                            class="group flex items-center justify-between gap-3 py-2.5 transition hover:bg-slate-50/50"
-                        >
-                            <div class="flex min-w-0 items-center gap-3">
-                                <span
-                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base shadow-2xs"
-                                    :class="doc.direction === 'in' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'"
-                                    aria-hidden="true"
-                                >
-                                    {{ documentIcon(doc) }}
-                                </span>
-                                <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                        <component
-                                            :is="documentRoute(doc) ? RouterLink : 'span'"
-                                            :to="documentRoute(doc) || undefined"
-                                            class="text-sm font-semibold text-slate-900 transition"
-                                            :class="documentRoute(doc) ? 'group-hover:text-blue-600 group-hover:underline' : ''"
-                                        >
-                                            {{ doc.kind_label }}
-                                        </component>
-                                        <span v-if="doc.reference_no" class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-500" dir="ltr">
-                                            {{ doc.reference_no }}
-                                        </span>
-                                    </div>
-                                    <div class="truncate text-xs text-slate-500">
-                                        {{ doc.party || '—' }} · <span dir="ltr">{{ doc.date }}</span>
-                                    </div>
-                                </div>
-                            </div>
-
+                <ul v-if="filteredRecentDocuments.length" class="-mx-2 space-y-0.5">
+                    <li
+                        v-for="doc in filteredRecentDocuments"
+                        :key="`${doc.kind}-${doc.id}`"
+                        class="group flex items-center justify-between gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    >
+                        <div class="flex min-w-0 items-center gap-3">
                             <span
-                                class="shrink-0 text-sm font-black tabular-nums"
-                                :class="doc.direction === 'in' ? 'text-emerald-700' : 'text-slate-800'"
+                                class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[15px]"
+                                :class="doc.direction === 'in' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'"
                             >
-                                {{ doc.direction === 'in' ? '+' : '−' }}{{ formatUsd(doc.amount) }}
+                                <AppIcon :name="documentIcon(doc)" />
                             </span>
-                        </li>
-                    </ul>
-                    <EmptyState v-else icon="🗂" title="لا توجد حركات مطابقة" hint="ستظهر هنا العمليات المعتمدة فور تسجيلها" />
-                </div>
-
-                <!-- Low stock watchlist -->
-                <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                    <div class="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">⚠️</span>
-                            <h3 class="font-bold text-slate-900">مواد قرب النفاد والمخزون الحرج</h3>
-                        </div>
-                        <RouterLink
-                            v-if="can('reports.view')"
-                            :to="{ name: 'reports', query: { tab: 'low-stock' } }"
-                            class="text-xs font-semibold text-amber-700 hover:underline"
-                        >
-                            تقرير النواقص ↗
-                        </RouterLink>
-                    </div>
-
-                    <ul v-if="data.low_stock.length" class="divide-y divide-slate-100">
-                        <li v-for="material in data.low_stock" :key="material.id" class="group py-2.5 transition hover:bg-slate-50/50">
-                            <div class="flex items-center justify-between gap-3">
-                                <div class="min-w-0">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
                                     <component
-                                        :is="can('reports.view') ? RouterLink : 'span'"
-                                        :to="can('reports.view')
-                                            ? { name: 'reports', query: { tab: 'low-stock', search: material.name } }
-                                            : undefined"
-                                        class="block truncate text-sm font-semibold text-slate-900"
-                                        :class="can('reports.view') ? 'group-hover:text-blue-600 group-hover:underline' : ''"
+                                        :is="documentRoute(doc) ? RouterLink : 'span'"
+                                        :to="documentRoute(doc) || undefined"
+                                        class="truncate text-sm font-semibold text-slate-900 dark:text-white transition"
+                                        :class="documentRoute(doc) ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400' : ''"
                                     >
-                                        {{ material.name }}
+                                        {{ doc.party || doc.kind_label }}
                                     </component>
-                                    <div class="text-xs text-slate-400">الحد الأدنى الآمن: {{ formatQty(material.min_stock) }} {{ material.unit || '' }}</div>
                                 </div>
-                                <span
-                                    class="shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold tabular-nums shadow-2xs"
-                                    :class="material.is_out_of_stock ? 'bg-red-50 text-red-700 ring-1 ring-red-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'"
+                                <div class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                    <span class="shrink-0">{{ doc.kind_label }}</span>
+                                    <span aria-hidden="true">·</span>
+                                    <span class="shrink-0 font-mono" dir="ltr">{{ doc.date }}</span>
+                                    <template v-if="doc.reference_no">
+                                        <span aria-hidden="true">·</span>
+                                        <span class="truncate font-mono" dir="ltr">{{ doc.reference_no }}</span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="shrink-0 text-sm font-bold tabular-nums" :class="doc.direction === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'">
+                            {{ doc.direction === 'in' ? '+' : '−' }}{{ formatUsd(doc.amount) }}
+                        </span>
+                    </li>
+                </ul>
+                <EmptyState v-else icon="🗂" title="لا توجد حركات مطابقة" hint="ستظهر هنا العمليات المعتمدة فور تسجيلها" />
+            </DashCard>
+
+            <!-- Low stock -->
+            <DashCard
+                title="مواد قرب النفاد"
+                icon="alert"
+                tone="bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"
+                :to="can('reports.view') ? { name: 'reports', query: { tab: 'low-stock' } } : null"
+                link-label="النواقص"
+                :class="data.workshop ? 'lg:col-span-12 xl:col-span-4' : 'lg:col-span-4'"
+            >
+                <ul
+                    v-if="data.low_stock.length"
+                    class="-mx-2 grid gap-x-4"
+                    :class="data.workshop ? 'sm:grid-cols-2 xl:grid-cols-1' : ''"
+                >
+                    <li v-for="material in data.low_stock" :key="material.id" class="group rounded-xl px-2 py-2.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <component
+                                    :is="can('reports.view') ? RouterLink : 'span'"
+                                    :to="can('reports.view') ? { name: 'reports', query: { tab: 'low-stock', search: material.name } } : undefined"
+                                    class="block truncate text-sm font-semibold text-slate-900 dark:text-white"
+                                    :class="can('reports.view') ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400' : ''"
                                 >
-                                    <span aria-hidden="true">{{ material.is_out_of_stock ? '⛔ نفد' : '⚠ متوفر' }}</span>
-                                    {{ formatQty(material.stock_quantity) }} {{ material.unit || '' }}
-                                </span>
+                                    {{ material.name }}
+                                </component>
+                                <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">الحد الأدنى {{ formatQty(material.min_stock) }} {{ material.unit || '' }}</div>
                             </div>
-                            <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                                <div class="h-full rounded-full transition-all duration-500" :style="coverageStyle(material)"></div>
-                            </div>
-                        </li>
-                    </ul>
-                    <EmptyState v-else icon="✅" title="المخزون في وضع آمن" hint="لا توجد أي مادة بلغت حدّها الأدنى حالياً" />
-                </div>
-            </div>
+                            <span
+                                class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums"
+                                :class="material.is_out_of_stock ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'"
+                            >
+                                {{ material.is_out_of_stock ? 'نفد' : `${formatQty(material.stock_quantity)} ${material.unit || ''}` }}
+                            </span>
+                        </div>
+                        <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div class="h-full rounded-full transition-all duration-500" :style="coverageStyle(material)"></div>
+                        </div>
+                    </li>
+                </ul>
+                <EmptyState v-else icon="✅" title="المخزون في وضع آمن" hint="لا توجد أي مادة بلغت حدّها الأدنى حالياً" />
+            </DashCard>
         </div>
     </div>
 </template>
@@ -735,9 +538,13 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import TrendChart from '../../components/charts/TrendChart.vue';
+import DashCard from '../../components/dashboard/DashCard.vue';
 import DashboardSkeleton from '../../components/dashboard/DashboardSkeleton.vue';
+import ProfitBreakdown from '../../components/dashboard/ProfitBreakdown.vue';
 import RankedList from '../../components/dashboard/RankedList.vue';
 import StatCard from '../../components/dashboard/StatCard.vue';
+import WorkshopPipeline from '../../components/dashboard/WorkshopPipeline.vue';
+import AppIcon from '../../components/ui/AppIcon.vue';
 import EmptyState from '../../components/ui/EmptyState.vue';
 import { dashboardApi } from '../../services/api';
 import { usePermissions } from '../../composables/usePermissions';
@@ -759,12 +566,17 @@ const trendSeries = [
     { key: 'purchases', label: 'المشتريات', color: '#eb6834' },
 ];
 
+const btnSecondary =
+    'inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-2xs transition hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white';
+const btnIcon =
+    'grid h-10 w-10 place-items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 shadow-2xs transition hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white disabled:opacity-40';
+
 const data = ref(null);
 const loading = ref(true);
 const refreshing = ref(false);
 const error = ref('');
 const loadedAt = ref(null);
-const kpiCategory = ref('all');
+const rankingTab = ref('customers');
 const recentFilter = ref('all');
 
 const recentFilters = [
@@ -810,6 +622,8 @@ const periodDaysCount = computed(() => {
     return Math.round(diff / 864e5) + 1;
 });
 
+const todayLabel = new Intl.DateTimeFormat('ar-SY-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
+
 const loadedAtLabel = computed(() =>
     loadedAt.value
         ? new Intl.DateTimeFormat('ar-SY-u-nu-latn', { timeStyle: 'short' }).format(loadedAt.value)
@@ -850,14 +664,15 @@ const canReset = computed(() => snapshot(filters) !== snapshot(defaults()));
 
 const quickActions = computed(() =>
     [
-        { label: 'فاتورة بيع جديدة', icon: '🧾', to: { name: 'sales.create' }, permission: 'sales.create', primary: true },
-        { label: 'استلام جهاز صيانة', icon: '🔧', to: { name: 'repairs', query: { create: 1 } }, permission: 'repairs.create', features: ['repairs'], primary: false },
-        { label: 'سند قبض نقدي', icon: '💵', to: { name: 'payments.create', query: { type: 'CUSTOMER' } }, permission: 'payments.create', primary: false },
-        { label: 'فاتورة شراء', icon: '📥', to: { name: 'purchases.create' }, permission: 'purchases.create', primary: false },
-        { label: 'تسجيل مصروف', icon: '📤', to: { name: 'expenses', query: { create: 1 } }, permission: 'expenses.create', primary: false },
+        { label: 'فاتورة بيع جديدة', icon: 'receipt', to: { name: 'sales.create' }, permission: 'sales.create', primary: true },
+        { label: 'استلام جهاز صيانة', icon: 'wrench', tone: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400', to: { name: 'repairs', query: { create: 1 } }, permission: 'repairs.create', features: ['repairs'], primary: false },
+        { label: 'سند قبض نقدي', icon: 'arrow-down-left', tone: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400', to: { name: 'payments.create', query: { type: 'CUSTOMER' } }, permission: 'payments.create', primary: false },
+        { label: 'فاتورة شراء', icon: 'cart', tone: 'bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400', to: { name: 'purchases.create' }, permission: 'purchases.create', primary: false },
+        { label: 'تسجيل مصروف', icon: 'trending-down', tone: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400', to: { name: 'expenses', query: { create: 1 } }, permission: 'expenses.create', primary: false },
         {
             label: 'صرف مستحقات خبير',
-            icon: '🧰',
+            icon: 'user-cog',
+            tone: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400',
             to: { name: 'payments.create', query: { type: 'TECHNICIAN' } },
             permission: ['payments.create', 'technicians.view'],
             features: ['repairs', 'technicians'],
@@ -895,8 +710,8 @@ const kpiCards = computed(() => {
             label: 'مبيعات اليوم',
             value: formatUsd(kpis.sales_today.amount),
             hint: `${kpis.sales_today.count} فاتورة معتمدة`,
-            icon: '🧾',
-            iconClass: 'bg-blue-50 text-blue-600',
+            icon: 'receipt',
+            iconClass: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 ring-1 ring-blue-500/20',
             to: can('sales.view') ? { name: 'sales' } : null,
         },
         {
@@ -905,8 +720,10 @@ const kpiCards = computed(() => {
             hint: `${kpis.sales_period.count} فاتورة`,
             delta: delta(kpis.sales_period.amount, previous?.sales_period.amount),
             goodWhen: 'up',
-            icon: '📈',
-            iconClass: 'bg-cyan-50 text-cyan-600',
+            icon: 'trending-up',
+            iconClass: 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-400 ring-1 ring-cyan-500/20',
+            spark: salesSpark.value,
+            sparkColor: trendSeries[0].color,
             to: can('sales.view') ? { name: 'sales' } : null,
         },
         {
@@ -914,8 +731,10 @@ const kpiCards = computed(() => {
             value: formatUsd(kpis.purchases_period.amount),
             hint: `${kpis.purchases_period.count} فاتورة`,
             delta: delta(kpis.purchases_period.amount, previous?.purchases_period.amount),
-            icon: '📥',
-            iconClass: 'bg-orange-50 text-orange-600',
+            icon: 'cart',
+            iconClass: 'bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 ring-1 ring-orange-500/20',
+            spark: purchasesSpark.value,
+            sparkColor: trendSeries[1].color,
             to: can('purchases.view') ? { name: 'purchases' } : null,
         },
         {
@@ -924,8 +743,8 @@ const kpiCards = computed(() => {
             hint: 'تحصيلات من العملاء',
             delta: delta(kpis.collected_period, previous?.collected_period),
             goodWhen: 'up',
-            icon: '💵',
-            iconClass: 'bg-emerald-50 text-emerald-600',
+            icon: 'arrow-down-left',
+            iconClass: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20',
             to: can('payments.view') ? { name: 'payments', query: { type: 'CUSTOMER' } } : null,
         },
         {
@@ -933,8 +752,8 @@ const kpiCards = computed(() => {
             value: formatUsd(kpis.paid_period),
             hint: 'سداد دفعات الموردين',
             delta: delta(kpis.paid_period, previous?.paid_period),
-            icon: '💸',
-            iconClass: 'bg-amber-50 text-amber-600',
+            icon: 'arrow-up-right',
+            iconClass: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/20',
             to: can('payments.view') ? { name: 'payments', query: { type: 'SUPPLIER' } } : null,
         },
         {
@@ -942,54 +761,21 @@ const kpiCards = computed(() => {
             value: formatUsd(kpis.expenses_period.amount),
             hint: `${kpis.expenses_period.count} سند مصروف`,
             delta: delta(kpis.expenses_period.amount, previous?.expenses_period.amount),
-            icon: '📤',
-            iconClass: 'bg-rose-50 text-rose-600',
+            icon: 'trending-down',
+            iconClass: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 ring-1 ring-rose-500/20',
             to: can('expenses.view') ? { name: 'expenses' } : null,
         },
     ];
 });
 
-const workshopKpis = computed(() => {
-    if (!data.value?.workshop) return [];
-    const ws = data.value.workshop;
+const salesSpark = computed(() => (data.value?.trend.points ?? []).map((p) => p.sales));
+const purchasesSpark = computed(() => (data.value?.trend.points ?? []).map((p) => p.purchases));
 
-    return [
-        {
-            label: 'أجهزة مستلمة في الفترة',
-            value: `${ws.received_count} جهاز`,
-            hint: 'وارد الصيانة الجديد',
-            icon: '📥',
-            iconClass: 'bg-blue-50 text-blue-600',
-            to: can('repairs.view') ? { name: 'repairs' } : null,
-        },
-        {
-            label: 'أجهزة تم تسليمها',
-            value: `${ws.delivered_count} جهاز`,
-            hint: `إيراد: ${formatUsd(ws.delivered_revenue)}`,
-            icon: '✅',
-            iconClass: 'bg-emerald-50 text-emerald-600',
-            to: can('repairs.view') ? { name: 'repairs', query: { status: 'DELIVERED' } } : null,
-        },
-        {
-            label: 'جاهزة بانتظار التسليم',
-            value: `${ws.ready_for_pickup} جهاز`,
-            hint: 'مكتملة ومجهزة للتسليم',
-            icon: '📦',
-            iconClass: 'bg-cyan-50 text-cyan-600',
-            to: can('repairs.view') ? { name: 'repairs', query: { status: 'READY' } } : null,
-        },
-        {
-            label: 'أجهزة قيد العمل بالورشة',
-            value: `${ws.active_in_shop} جهاز`,
-            hint: 'قيد الفحص أو الإصلاح',
-            icon: '🔧',
-            iconClass: 'bg-amber-50 text-amber-600',
-            to: can('repairs.view') ? { name: 'repairs' } : null,
-        },
-    ];
-});
-
-const allKpiCount = computed(() => kpiCards.value.length + workshopKpis.value.length);
+const netCashFlow = computed(
+    () =>
+        data.value?.profit_overview?.net_cash_flow ??
+        (Number(data.value?.kpis.collected_period) || 0) - (Number(data.value?.kpis.paid_period) || 0)
+);
 
 const activeAlerts = computed(() => {
     if (!data.value) return [];
@@ -999,56 +785,63 @@ const activeAlerts = computed(() => {
         {
             count: alerts.repairs_ready ?? 0,
             label: 'أجهزة جاهزة للتسليم للعميل',
-            icon: '🎉',
-            tone: 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:shadow-sm',
+            icon: 'check-circle',
+            iconTone: 'text-emerald-600 dark:text-emerald-400',
+            countTone: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/20',
             to: { name: 'repairs', query: { status: 'READY' } },
             permission: 'repairs.view',
         },
         {
             count: alerts.repairs_waiting_approval ?? 0,
             label: 'أجهزة بانتظار موافقة العميل',
-            icon: '⏳',
-            tone: 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:shadow-sm',
+            icon: 'clock',
+            iconTone: 'text-amber-600 dark:text-amber-400',
+            countTone: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/20',
             to: { name: 'repairs', query: { status: 'WAITING_APPROVAL' } },
             permission: 'repairs.view',
         },
         {
             count: alerts.out_of_stock ?? 0,
             label: 'مواد نفدت من المخزون',
-            icon: '⛔',
-            tone: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:shadow-sm',
+            icon: 'x-circle',
+            iconTone: 'text-rose-600 dark:text-rose-400',
+            countTone: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 ring-1 ring-rose-500/20',
             to: { name: 'reports', query: { tab: 'low-stock' } },
             permission: 'reports.view',
         },
         {
             count: alerts.low_stock ?? 0,
             label: 'مواد قرب النفاد',
-            icon: '⚠',
-            tone: 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:shadow-sm',
+            icon: 'alert',
+            iconTone: 'text-amber-600 dark:text-amber-400',
+            countTone: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/20',
             to: { name: 'reports', query: { tab: 'low-stock' } },
             permission: 'reports.view',
         },
         {
             count: alerts.draft_sales ?? 0,
             label: 'فواتير بيع غير معتمدة',
-            icon: '📝',
-            tone: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:shadow-sm',
+            icon: 'file',
+            iconTone: 'text-slate-400 dark:text-slate-500',
+            countTone: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-1 ring-slate-200 dark:ring-slate-700',
             to: { name: 'sales' },
             permission: 'sales.view',
         },
         {
             count: alerts.draft_purchases ?? 0,
             label: 'فواتير شراء غير معتمدة',
-            icon: '📝',
-            tone: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:shadow-sm',
+            icon: 'file',
+            iconTone: 'text-slate-400 dark:text-slate-500',
+            countTone: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-1 ring-slate-200 dark:ring-slate-700',
             to: { name: 'purchases' },
             permission: 'purchases.view',
         },
         {
             count: alerts.draft_payments ?? 0,
             label: 'دفعات غير معتمدة',
-            icon: '📝',
-            tone: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:shadow-sm',
+            icon: 'file',
+            iconTone: 'text-slate-400 dark:text-slate-500',
+            countTone: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-1 ring-slate-200 dark:ring-slate-700',
             to: { name: 'payments' },
             permission: 'payments.view',
         },
@@ -1121,20 +914,21 @@ const topServices = computed(() => {
     }));
 });
 
-// One column per ranking card on wide screens, wrapping once there are more than four.
-const rankingGridClass = computed(() => {
-    const cards = 2
-        + (topBrands.value.length ? 1 : 0)
-        + (data.value?.top_technicians ? 1 : 0)
-        + (data.value?.top_services ? 1 : 0);
+/** Every shortlist the user may see, one tab each in the rankings card. */
+const rankingTabs = computed(() => {
+    if (!data.value) return [];
 
-    return {
-        2: 'lg:grid-cols-2',
-        3: 'lg:grid-cols-2 xl:grid-cols-3',
-        4: 'lg:grid-cols-2 2xl:grid-cols-4',
-        5: 'lg:grid-cols-2 xl:grid-cols-3',
-    }[cards];
+    return [
+        { key: 'customers', label: 'العملاء', rows: topCustomers.value, color: '#2a78d6', emptyIcon: '👥', emptyTitle: 'لا توجد مبيعات مسجلة', to: can('customers.view') ? { name: 'customers' } : null, linkLabel: 'دليل العملاء' },
+        { key: 'materials', label: 'المواد', rows: topMaterials.value, color: '#8b5cf6', emptyIcon: '📦', emptyTitle: 'لا توجد مواد مباعة', to: can('inventory.view') ? { name: 'inventory' } : null, linkLabel: 'المخزون' },
+        data.value.top_services && { key: 'services', label: 'الخدمات', rows: topServices.value, color: '#0ea5e9', emptyIcon: '🛠️', emptyTitle: 'لا توجد خدمات مباعة', to: { name: 'services' }, linkLabel: 'دليل الخدمات' },
+        topBrands.value.length && { key: 'brands', label: 'الأجهزة', rows: topBrands.value, color: '#6366f1', emptyIcon: '🔧', emptyTitle: 'لا توجد أجهزة مستلمة', to: can('repairs.view') ? { name: 'repairs' } : null, linkLabel: 'الصيانة' },
+        data.value.top_technicians && { key: 'technicians', label: 'الخبراء', rows: topTechnicians.value, color: '#14b8a6', emptyIcon: '🧰', emptyTitle: 'لا توجد أجهزة مسوّاة لخبراء', to: { name: 'technicians' }, linkLabel: 'الخبراء' },
+    ].filter(Boolean);
 });
+
+// Falls back to the first tab when a refresh drops the one that was open.
+const currentRanking = computed(() => rankingTabs.value.find((tab) => tab.key === rankingTab.value) ?? rankingTabs.value[0]);
 
 const filteredRecentDocuments = computed(() => {
     const list = data.value?.recent_documents ?? [];
@@ -1151,9 +945,9 @@ const DOCUMENT_ROUTES = {
 };
 
 const DOCUMENT_ICONS = {
-    sales_invoice: '🧾',
-    purchase_invoice: '📥',
-    payment: '💵',
+    sales_invoice: 'receipt',
+    purchase_invoice: 'cart',
+    expense: 'trending-down',
 };
 
 function documentRoute(doc) {
@@ -1163,8 +957,8 @@ function documentRoute(doc) {
 }
 
 function documentIcon(doc) {
-    if (doc.kind === 'payment') return doc.direction === 'in' ? '💵' : '💸';
-    return DOCUMENT_ICONS[doc.kind] ?? '📄';
+    if (doc.kind === 'payment') return doc.direction === 'in' ? 'arrow-down-left' : 'arrow-up-right';
+    return DOCUMENT_ICONS[doc.kind] ?? 'file';
 }
 
 function share(value, total) {
@@ -1357,33 +1151,14 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibil
         background: #fff;
     }
 
-    #dashboard-sheet {
-        gap: 0;
-    }
-
-    #dashboard-sheet .rounded-2xl,
-    #dashboard-sheet .rounded-3xl {
+    #dashboard-sheet .dash-card {
         break-inside: avoid;
         box-shadow: none !important;
         border-color: #cbd5e1 !important;
     }
 
-    /*
-     * The hero's gradient does not print, so its white text would vanish on a
-     * white page — force dark ink and drop the decorative glows instead.
-     */
-    #dashboard-sheet .dashboard-hero,
-    #dashboard-sheet .dashboard-hero * {
-        color: #0f172a !important;
-        background: transparent !important;
-    }
-
-    #dashboard-sheet .dashboard-hero .hero-blob {
+    #dashboard-sheet .hero-glow {
         display: none;
-    }
-
-    #dashboard-sheet .dashboard-hero .position-track {
-        background: #f1f5f9;
     }
 }
 </style>
