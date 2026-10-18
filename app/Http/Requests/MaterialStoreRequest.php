@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\CostMethod;
 use App\Models\Material;
 use App\Services\NumberingService;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class MaterialStoreRequest extends FormRequest
 {
@@ -27,6 +29,7 @@ class MaterialStoreRequest extends FormRequest
             'barcode' => ['nullable', 'string', 'max:64', $this->uniqueCode('barcode')],
             'unit_id' => ['required', 'exists:service_units,id'],
             'cost_price' => ['required', 'numeric', 'min:0', 'max:99999999999'],
+            'cost_method' => ['nullable', Rule::enum(CostMethod::class)],
             'sale_price' => ['required', 'numeric', 'min:0', 'max:99999999999'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['boolean'],
@@ -36,6 +39,13 @@ class MaterialStoreRequest extends FormRequest
     public function rules(): array
     {
         return $this->baseRules();
+    }
+
+    public function messages(): array
+    {
+        return [
+            'cost_method.enum' => 'طريقة حساب التكلفة غير معروفة.',
+        ];
     }
 
     protected function prepareForValidation(): void

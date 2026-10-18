@@ -28,6 +28,7 @@ class SettingUpdateRequest extends FormRequest
      */
     protected const ALLOWED_VALUES = [
         'inventory_sale_policy' => ['strict', 'permissive'],
+        'inventory_cost_method' => ['MANUAL', 'WEIGHTED_AVERAGE', 'LAST_PURCHASE', 'FIFO'],
         'currency_code' => ['USD'],
         'currency_symbol' => ['$'],
         'currency_name' => ['دولار', 'دولار أمريكي', 'USD'],
@@ -58,7 +59,7 @@ class SettingUpdateRequest extends FormRequest
      * @var array<int, string>
      */
     protected const REQUIRED_KEYS = [
-        'company_name', 'currency_symbol', 'currency_name', 'inventory_sale_policy',
+        'company_name', 'currency_symbol', 'currency_name', 'inventory_sale_policy', 'inventory_cost_method',
         'print_paper_invoice', 'print_paper_payment', 'print_paper_repair', 'print_paper_statement',
     ];
 
@@ -110,6 +111,7 @@ class SettingUpdateRequest extends FormRequest
     {
         return [
             'values.inventory_sale_policy.in' => 'سياسة المخزون يجب أن تكون "strict" أو "permissive".',
+            'values.inventory_cost_method.in' => 'طريقة حساب التكلفة غير معروفة.',
             'values.company_name.required' => 'اسم الشركة مطلوب.',
             'values.currency_symbol.required' => 'رمز العملة مطلوب.',
             'values.currency_symbol.in' => 'العملة المعتمدة في النظام هي الدولار ($) فقط.',

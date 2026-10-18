@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CostMethod;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ class Material extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'category_id', 'name', 'sku', 'barcode', 'unit_id', 'cost_price', 'sale_price',
+        'category_id', 'name', 'sku', 'barcode', 'unit_id', 'cost_price', 'cost_method', 'sale_price',
         'min_stock', 'is_active', 'stock_quantity',
     ];
 
@@ -21,6 +22,7 @@ class Material extends Model
     {
         return [
             'cost_price' => 'decimal:2',
+            'cost_method' => CostMethod::class,
             'sale_price' => 'decimal:2',
             'min_stock' => 'decimal:3',
             'stock_quantity' => 'decimal:3',

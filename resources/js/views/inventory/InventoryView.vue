@@ -91,6 +91,11 @@
                                 {{ row.name }}
                                 <span v-if="row.is_out_of_stock" class="mr-2 rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">نافدة</span>
                                 <span v-else-if="row.is_low" class="mr-2 rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-800">قرب النفاد</span>
+                                <span v-if="row.cost_method && row.cost_method !== 'MANUAL'"
+                                    class="mr-2 rounded bg-violet-50 px-2 py-0.5 text-xs text-violet-700"
+                                    :title="`طريقة حساب التكلفة: ${row.cost_method_label}`">
+                                    {{ row.cost_method_label }}
+                                </span>
                             </td>
                             <td class="px-4 py-3 text-slate-500" dir="ltr">{{ row.sku || '—' }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ row.category || '—' }}</td>
@@ -259,6 +264,7 @@
                     <div class="rounded-xl border border-slate-200 p-3">
                         <div class="text-xs text-slate-500">التكلفة</div>
                         <div class="mt-1 font-bold text-slate-900">{{ formatMoney(history.material.cost_price) }}</div>
+                        <div class="text-xs text-slate-400">{{ history.material.cost_method_label }}</div>
                     </div>
                 </div>
 

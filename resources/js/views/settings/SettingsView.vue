@@ -160,6 +160,17 @@ const meta = {
         wide: true,
         hint: 'تؤثر على ترحيل فواتير البيع وتسويات المخزون',
     },
+    inventory_cost_method: {
+        label: 'طريقة حساب التكلفة الافتراضية',
+        options: [
+            { value: 'MANUAL', label: 'يدوية — التكلفة كما تُدخل ولا تتغيّر تلقائياً' },
+            { value: 'WEIGHTED_AVERAGE', label: 'المتوسط المرحّل — تُحدَّث مع كل عملية توريد' },
+            { value: 'LAST_PURCHASE', label: 'آخر سعر شراء — تُستبدل بسعر آخر فاتورة شراء' },
+            { value: 'FIFO', label: 'الوارد أولاً (FIFO) — تُصرف أقدم دفعات الشراء بسعرها الفعلي' },
+        ],
+        wide: true,
+        hint: 'الافتراضي للمواد الجديدة — يمكن تخصيص الطريقة لكل مادة من نموذج المادة',
+    },
     invoice_prefix: { label: 'بادئة فواتير البيع', ltr: true, placeholder: 'SL-' },
     purchase_prefix: { label: 'بادئة فواتير الشراء', ltr: true, placeholder: 'PR-' },
     payment_prefix: { label: 'بادئة السندات', ltr: true, placeholder: 'PAY-' },

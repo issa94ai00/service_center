@@ -60,6 +60,8 @@ class InventoryController extends Controller
                 'stock_quantity' => $m->stock_quantity,
                 'min_stock' => $m->min_stock,
                 'cost_price' => $m->cost_price,
+                'cost_method' => $m->cost_method?->value,
+                'cost_method_label' => $m->cost_method?->label(),
                 'stock_value' => Money::fromDecimal($m->cost_price)
                     ->multiplyBy((float) $m->stock_quantity)->toDecimal(),
                 'is_low' => $m->is_low,
@@ -94,6 +96,8 @@ class InventoryController extends Controller
                     'stock_quantity' => $material->stock_quantity,
                     'min_stock' => $material->min_stock,
                     'cost_price' => $material->cost_price,
+                    'cost_method' => $material->cost_method?->value,
+                    'cost_method_label' => $material->cost_method?->label(),
                     'is_low' => $material->is_low,
                 ],
                 'movements' => $rows,

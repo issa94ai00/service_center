@@ -27,7 +27,10 @@ use Illuminate\Support\Facades\DB;
  */
 class InventoryService
 {
-    public function __construct(private readonly NumberingService $numbers) {}
+    public function __construct(
+        private readonly NumberingService $numbers,
+        private readonly MaterialCostService $costs,
+    ) {}
 
     /**
      * @param  array{reason: string, items: array<int, array{material_id: int, direction: string, quantity: string, unit_cost?: ?string, reason?: ?string}>}  $data
@@ -92,6 +95,16 @@ class InventoryService
                     'created_by' => $userId,
                 ]);
 
+                if ($direction === MovementDirection::IN) {
+                    $this->costs->applyInbound($material, $quantity, (string) $unitCost, [
+                        'type' => MovementSourceType::INVENTORY_ADJUSTMENT->value,
+                        'id' => $adjustment->id,
+                        'date' => $date,
+                    ]);
+                } else {
+                    $this->costs->applyOutbound($material, $quantity);
+                }
+
                 $this->applyToStock($material->id, $direction, $quantity);
             }
 
@@ -140,6 +153,12 @@ class InventoryService
                 ]);
 
                 $original?->update(['cancelled_reason' => $reason]);
+
+                if ($opposite === MovementDirection::OUT) {
+                    $this->costs->reverseInbound($material, (string) $item->quantity);
+                } else {
+                    $this->costs->reverseOutbound($material, (string) $item->quantity, (string) ($item->unit_cost ?? $material->cost_price));
+                }
 
                 $this->applyToStock($item->material_id, $opposite, (string) $item->quantity);
             }

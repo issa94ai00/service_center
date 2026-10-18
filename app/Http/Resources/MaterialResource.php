@@ -21,6 +21,8 @@ class MaterialResource extends JsonResource
             'unit_id' => $this->unit_id,
             'unit' => ServiceUnitResource::make($this->whenLoaded('unit')),
             'cost_price' => $this->cost_price,
+            'cost_method' => $this->cost_method?->value,
+            'cost_method_label' => $this->cost_method?->label(),
             'sale_price' => $this->sale_price,
             'min_stock' => $this->min_stock,
             'is_active' => $this->is_active,

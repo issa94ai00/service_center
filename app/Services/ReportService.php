@@ -155,7 +155,7 @@ class ReportService
             ->where('sales_invoices.status', DocumentStatus::POSTED)
             ->whereBetween('sales_invoices.invoice_date', $dateRange)
             ->where('sales_invoice_items.line_type', 'MATERIAL')
-            ->selectRaw('COALESCE(SUM(sales_invoice_items.quantity * materials.cost_price), 0) as cogs')
+            ->selectRaw('COALESCE(SUM(COALESCE(sales_invoice_items.cost_amount, sales_invoice_items.quantity * materials.cost_price)), 0) as cogs')
             ->value('cogs');
 
         $netRevenueMoney = Money::fromDecimal($salesTotals?->total);
@@ -237,7 +237,7 @@ class ReportService
             ->whereBetween('sales_invoices.invoice_date', $dateRange)
             ->where('sales_invoice_items.line_type', 'MATERIAL')
             ->groupBy('sales_invoices.invoice_date')
-            ->selectRaw('sales_invoices.invoice_date as date, COALESCE(SUM(sales_invoice_items.quantity * materials.cost_price), 0) as cogs')
+            ->selectRaw('sales_invoices.invoice_date as date, COALESCE(SUM(COALESCE(sales_invoice_items.cost_amount, sales_invoice_items.quantity * materials.cost_price)), 0) as cogs')
             ->get()
             ->keyBy(fn ($r) => substr((string) $r->date, 0, 10));
 
@@ -303,8 +303,8 @@ class ReportService
             ->selectRaw('materials.id, materials.name, materials.sku, service_units.name_ar as unit')
             ->selectRaw('COALESCE(SUM(sales_invoice_items.quantity), 0) as quantity')
             ->selectRaw('COALESCE(SUM(sales_invoice_items.line_total), 0) as revenue')
-            ->selectRaw('COALESCE(SUM(sales_invoice_items.quantity * materials.cost_price), 0) as cost')
-            ->selectRaw('COALESCE(SUM(sales_invoice_items.line_total - (sales_invoice_items.quantity * materials.cost_price)), 0) as profit')
+            ->selectRaw('COALESCE(SUM(COALESCE(sales_invoice_items.cost_amount, sales_invoice_items.quantity * materials.cost_price)), 0) as cost')
+            ->selectRaw('COALESCE(SUM(sales_invoice_items.line_total), 0) - COALESCE(SUM(COALESCE(sales_invoice_items.cost_amount, sales_invoice_items.quantity * materials.cost_price)), 0) as profit')
             ->orderByDesc('profit')
             ->limit(10)
             ->get()

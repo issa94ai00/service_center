@@ -29,6 +29,7 @@ class InvoiceService
     public function __construct(
         private readonly NumberingService $numbers,
         private readonly PaymentService $payments,
+        private readonly MaterialCostService $costs,
     ) {}
 
     /**
@@ -81,6 +82,8 @@ class InvoiceService
             $invoice->save();
 
             foreach ($invoice->items as $item) {
+                $material = Material::withTrashed()->whereKey($item->material_id)->lockForUpdate()->first();
+
                 $this->createMovement(
                     materialId: $item->material_id,
                     type: MovementType::PURCHASE,
@@ -95,7 +98,14 @@ class InvoiceService
                     userId: $userId
                 );
 
-                Material::withTrashed()->whereKey($item->material_id)->increment('stock_quantity', $item->quantity);
+                if ($material) {
+                    $this->costs->applyInbound($material, (string) $item->quantity, $this->purchaseUnitCost($item), [
+                        'type' => MovementSourceType::PURCHASE_INVOICE->value,
+                        'id' => $invoice->id,
+                        'date' => $invoice->purchase_date,
+                    ]);
+                    $material->increment('stock_quantity', $item->quantity);
+                }
             }
 
             SupplierTransaction::query()->create([
@@ -159,6 +169,8 @@ class InvoiceService
 
             foreach ($invoice->items as $item) {
                 if ($item->line_type === LineType::MATERIAL) {
+                    $material = Material::withTrashed()->whereKey($item->material_id)->lockForUpdate()->first();
+
                     $this->createMovement(
                         materialId: $item->material_id,
                         type: MovementType::SALE,
@@ -173,7 +185,16 @@ class InvoiceService
                         userId: $userId
                     );
 
-                    Material::withTrashed()->whereKey($item->material_id)->decrement('stock_quantity', $item->quantity);
+                    if ($material) {
+                        $cogs = $this->costs->applyOutbound($material, (string) $item->quantity);
+
+                        if ($cogs !== null) {
+                            $item->cost_amount = $cogs;
+                            $item->save();
+                        }
+
+                        $material->decrement('stock_quantity', $item->quantity);
+                    }
                 }
             }
 
@@ -238,7 +259,13 @@ class InvoiceService
                     reason: $reason,
                     userId: $userId
                 );
-                Material::withTrashed()->whereKey($item->material_id)->decrement('stock_quantity', $item->quantity);
+
+                $material = Material::withTrashed()->whereKey($item->material_id)->lockForUpdate()->first();
+
+                if ($material) {
+                    $this->costs->reverseInbound($material, (string) $item->quantity);
+                    $material->decrement('stock_quantity', $item->quantity);
+                }
             }
 
             SupplierTransaction::query()->create([
@@ -283,7 +310,13 @@ class InvoiceService
                     reason: $reason,
                     userId: $userId
                 );
-                Material::withTrashed()->whereKey($item->material_id)->increment('stock_quantity', $item->quantity);
+
+                $material = Material::withTrashed()->whereKey($item->material_id)->lockForUpdate()->first();
+
+                if ($material) {
+                    $this->costs->reverseOutbound($material, (string) $item->quantity, $this->returnUnitCost($item, $material));
+                    $material->increment('stock_quantity', $item->quantity);
+                }
             }
 
             CustomerTransaction::query()->create([
@@ -448,6 +481,33 @@ class InvoiceService
         }
 
         return $invoice;
+    }
+
+    protected function purchaseUnitCost(PurchaseInvoiceItem $item): string
+    {
+        $netCents = Money::fromDecimal($item->unit_price)
+            ->multiplyBy($item->quantity)
+            ->subtract(Money::fromDecimal($item->discount_amount))
+            ->toCents();
+
+        $quantity = (float) $item->quantity;
+
+        if ($quantity <= 0) {
+            return Money::fromDecimal($item->unit_price)->toDecimal();
+        }
+
+        return Money::fromCents((int) round($netCents / $quantity))->toDecimal();
+    }
+
+    protected function returnUnitCost(SalesInvoiceItem $item, Material $material): string
+    {
+        $quantity = (float) $item->quantity;
+
+        if ($item->cost_amount !== null && $quantity > 0) {
+            return Money::fromDecimal($item->cost_amount)->multiplyBy(1 / $quantity)->toDecimal();
+        }
+
+        return (string) $material->cost_price;
     }
 
     protected function recomputeTotals($items, string $discountType, string $discountValue): array

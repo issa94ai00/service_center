@@ -103,6 +103,7 @@ class SystemConfigSeeder extends Seeder
             ['key' => 'company_tax_number', 'value' => '', 'group' => 'general', 'type' => 'string'],
             ['key' => 'allow_overpayment', 'value' => '0', 'group' => 'financial', 'type' => 'bool'],
             ['key' => 'inventory_sale_policy', 'value' => 'strict', 'group' => 'financial', 'type' => 'string'],
+            ['key' => 'inventory_cost_method', 'value' => 'MANUAL', 'group' => 'financial', 'type' => 'string'],
             ['key' => 'invoice_prefix', 'value' => 'SL-', 'group' => 'numbers', 'type' => 'string'],
             ['key' => 'purchase_prefix', 'value' => 'PR-', 'group' => 'numbers', 'type' => 'string'],
             ['key' => 'payment_prefix', 'value' => 'PAY-', 'group' => 'numbers', 'type' => 'string'],

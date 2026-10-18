@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\CostMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MaterialStoreRequest;
 use App\Http\Requests\MaterialUpdateRequest;
 use App\Http\Resources\MaterialResource;
 use App\Models\Material;
+use App\Models\Setting;
 use App\Services\CatalogArchiveService;
+use App\Services\MaterialCostService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +18,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class MaterialsController extends Controller
 {
-    public function __construct(protected CatalogArchiveService $archive) {}
+    public function __construct(
+        protected CatalogArchiveService $archive,
+        protected MaterialCostService $costs,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -117,7 +123,10 @@ class MaterialsController extends Controller
     {
         $this->authorize('create', Material::class);
 
-        $material = Material::query()->create(array_merge($request->validated(), [
+        $data = $request->validated();
+        $data['cost_method'] ??= Setting::get('inventory_cost_method', CostMethod::MANUAL->value);
+
+        $material = Material::query()->create(array_merge($data, [
             'is_active' => (bool) $request->boolean('is_active', true),
             'stock_quantity' => 0,
         ]));
@@ -141,6 +150,7 @@ class MaterialsController extends Controller
     {
         $this->authorize('update', $material);
         $material->update($request->validated());
+        $this->costs->seedFifoOpening($material);
         $material->load(['category', 'unit']);
 
         return response()->json([
