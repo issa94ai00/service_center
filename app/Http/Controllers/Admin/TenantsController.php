@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Backups\BackupService;
 use App\Http\Controllers\Controller;
+use App\Models\Central\Backup;
 use App\Models\Central\Tenant;
 use App\Tenancy\Tenancy;
 use App\Tenancy\TenantManager;
@@ -15,7 +17,10 @@ use Throwable;
 
 class TenantsController extends Controller
 {
-    public function __construct(private readonly TenantManager $manager) {}
+    public function __construct(
+        private readonly TenantManager $manager,
+        private readonly BackupService $backups,
+    ) {}
 
     public function meta(): JsonResponse
     {
@@ -51,10 +56,18 @@ class TenantsController extends Controller
         try {
             $payload['features'] = $this->manager->features($tenant);
             $payload['stats'] = $this->manager->stats($tenant);
+            $payload['pending_migrations'] = $this->manager->pendingMigrations($tenant);
         } catch (Throwable $e) {
             Log::warning("Tenant {$tenant->slug}: could not read its database", ['error' => $e->getMessage()]);
             $payload['database_error'] = 'تعذّر الوصول إلى قاعدة بيانات المتجر.';
         }
+
+        $last = Backup::query()->where('tenant_id', $tenant->id)->where('status', Backup::STATUS_COMPLETED)->latest('id')->first();
+        $payload['backups'] = [
+            'count' => Backup::query()->where('tenant_id', $tenant->id)->where('status', Backup::STATUS_COMPLETED)->count(),
+            'last_at' => $last?->created_at?->toIso8601String(),
+            'last_size_bytes' => $last?->size_bytes,
+        ];
 
         return response()->json(['data' => $payload]);
     }
@@ -145,15 +158,48 @@ class TenantsController extends Controller
         return response()->json(['data' => $this->present($tenant->refresh())]);
     }
 
-    public function migrate(Tenant $tenant): JsonResponse
+    /** Bring the shop's schema up to date, backing it up first when there is anything to run. */
+    public function migrate(Request $request, Tenant $tenant): JsonResponse
     {
+        @set_time_limit((int) config('backups.timeout'));
+
         try {
-            $output = $this->manager->migrate($tenant);
+            $pending = $this->manager->pendingMigrations($tenant);
         } catch (Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
+            return response()->json(['message' => 'تعذّر قراءة حالة قاعدة البيانات: '.$e->getMessage()], 500);
         }
 
-        return response()->json(['message' => trim($output) ?: 'قاعدة البيانات محدّثة.']);
+        if (! $pending) {
+            return response()->json(['message' => 'قاعدة البيانات محدّثة، لا توجد تحديثات معلّقة.', 'pending_migrations' => []]);
+        }
+
+        $backup = $this->backups->backupTenant($tenant, Backup::TRIGGER_PRE_MIGRATE, $request->user('admin')?->id);
+        if ($backup->status !== Backup::STATUS_COMPLETED) {
+            return response()->json(['message' => 'أُلغي التحديث لأن النسخة الاحتياطية قبله فشلت: '.$backup->error], 500);
+        }
+
+        try {
+            $this->manager->migrate($tenant);
+        } catch (Throwable $e) {
+            return response()->json(['message' => $e->getMessage()."\nنسخة ما قبل التحديث رقم {$backup->id} محفوظة."], 500);
+        }
+
+        return response()->json([
+            'message' => 'طُبّق '.count($pending).' تحديث على قاعدة البيانات بعد أخذ نسخة احتياطية.',
+            'pending_migrations' => [],
+        ]);
+    }
+
+    /** Close or reopen the shop to its users without touching its status. */
+    public function maintenance(Request $request, Tenant $tenant): JsonResponse
+    {
+        $on = $request->validate(['on' => ['required', 'boolean']])['on'];
+
+        $on
+            ? $this->backups->setMaintenance($tenant, 'صيانة يدوية من إدارة المنصة')
+            : $this->backups->clearMaintenance($tenant);
+
+        return response()->json(['data' => $this->present($tenant->refresh())]);
     }
 
     public function destroy(Request $request, Tenant $tenant): JsonResponse
@@ -167,6 +213,15 @@ class TenantsController extends Controller
 
         if ($tenant->status !== Tenant::STATUS_ARCHIVED) {
             return response()->json(['message' => 'أرشف المتجر أولاً قبل حذفه نهائياً.'], 422);
+        }
+
+        // Dropping the database is the one step nothing else can undo; keep a last copy.
+        if ($data['drop_database'] ?? false) {
+            @set_time_limit((int) config('backups.timeout'));
+            $backup = $this->backups->backupTenant($tenant, Backup::TRIGGER_PRE_DELETE, $request->user('admin')?->id);
+            if ($backup->status !== Backup::STATUS_COMPLETED) {
+                return response()->json(['message' => 'أُلغي الحذف لأن النسخة الاحتياطية الأخيرة فشلت: '.$backup->error], 422);
+            }
         }
 
         try {
@@ -199,6 +254,8 @@ class TenantsController extends Controller
             'notes' => $tenant->notes,
             'ssl_status' => $tenant->ssl_status,
             'ssl_message' => $tenant->ssl_message,
+            'maintenance_at' => $tenant->maintenance_at?->toIso8601String(),
+            'maintenance_reason' => $tenant->maintenance_reason,
             'created_at' => $tenant->created_at?->toIso8601String(),
         ];
     }

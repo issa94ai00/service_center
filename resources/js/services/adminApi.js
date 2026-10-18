@@ -54,7 +54,44 @@ export const tenantsApi = {
         return data.data;
     },
     async migrate(id) {
-        const { data } = await api.post(`/admin/tenants/${id}/migrate`, null, { timeout: 300000 });
+        const { data } = await api.post(`/admin/tenants/${id}/migrate`, null, { timeout: 600000 });
         return data;
+    },
+    async setMaintenance(id, on) {
+        const { data } = await api.post(`/admin/tenants/${id}/maintenance`, { on });
+        return data.data;
+    },
+};
+
+/** Database backups: dumps, restores and their health. */
+export const backupsApi = {
+    async overview() {
+        const { data } = await api.get('/admin/backups/overview');
+        return data.data;
+    },
+    async list(params = {}) {
+        const { data } = await api.get('/admin/backups', { params });
+        return data;
+    },
+    /** One database now: `{ tenant_id }` for a shop, `{ central: true }` for the registry. */
+    async create(payload) {
+        const { data } = await api.post('/admin/backups', payload, { timeout: 600000 });
+        return data;
+    },
+    async restore(id, confirmSlug) {
+        const { data } = await api.post(`/admin/backups/${id}/restore`, { confirm_slug: confirmSlug }, { timeout: 1200000 });
+        return data;
+    },
+    async retryOffsite(id) {
+        const { data } = await api.post(`/admin/backups/${id}/offsite`, null, { timeout: 600000 });
+        return data;
+    },
+    async remove(id) {
+        const { data } = await api.delete(`/admin/backups/${id}`);
+        return data;
+    },
+    /** Same-origin URL; the admin session cookie authorises the download. */
+    downloadUrl(id) {
+        return `/api/admin/backups/${id}/download`;
     },
 };

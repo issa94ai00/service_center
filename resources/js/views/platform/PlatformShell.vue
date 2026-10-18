@@ -16,11 +16,12 @@
                             v-for="item in nav"
                             :key="item.name"
                             :to="{ name: item.name }"
+                            :title="item.label"
                             class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-slate-500 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                             :class="isActive(item) ? '!bg-slate-100 dark:!bg-slate-800 !text-slate-900 dark:!text-white' : ''"
                         >
                             <AppIcon :name="item.icon" class="text-base" />
-                            <span>{{ item.label }}</span>
+                            <span class="hidden sm:inline">{{ item.label }}</span>
                         </router-link>
                     </nav>
                 </div>
@@ -105,6 +106,7 @@ const host = window.location.host;
 const nav = [
     // A shop's own page still belongs under "shops" in the nav.
     { name: 'tenants', label: 'المتاجر', icon: 'store', also: ['tenant'] },
+    { name: 'databases', label: 'قواعد البيانات', icon: 'database' },
     { name: 'account', label: 'حسابي', icon: 'user' },
 ];
 

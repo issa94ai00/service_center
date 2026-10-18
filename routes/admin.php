@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminAuthController;
+use App\Http\Controllers\Admin\BackupsController;
 use App\Http\Controllers\Admin\TenantsController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,4 +26,13 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/tenants/{tenant}/reset-password', [TenantsController::class, 'resetPassword']);
     Route::post('/tenants/{tenant}/certificate', [TenantsController::class, 'issueCertificate']);
     Route::post('/tenants/{tenant}/migrate', [TenantsController::class, 'migrate']);
+    Route::post('/tenants/{tenant}/maintenance', [TenantsController::class, 'maintenance']);
+
+    Route::get('/backups/overview', [BackupsController::class, 'overview']);
+    Route::get('/backups', [BackupsController::class, 'index']);
+    Route::post('/backups', [BackupsController::class, 'store']);
+    Route::get('/backups/{backup}/download', [BackupsController::class, 'download']);
+    Route::post('/backups/{backup}/restore', [BackupsController::class, 'restore']);
+    Route::post('/backups/{backup}/offsite', [BackupsController::class, 'retryOffsite']);
+    Route::delete('/backups/{backup}', [BackupsController::class, 'destroy']);
 });

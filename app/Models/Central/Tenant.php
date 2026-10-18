@@ -17,13 +17,14 @@ class Tenant extends Model
     protected $fillable = [
         'slug', 'name', 'database', 'status', 'source', 'signup_ip', 'plan', 'expires_at',
         'owner_name', 'owner_email', 'contact_phone', 'notes',
-        'ssl_status', 'ssl_message',
+        'ssl_status', 'ssl_message', 'maintenance_at', 'maintenance_reason',
     ];
 
     protected function casts(): array
     {
         return [
             'expires_at' => 'date',
+            'maintenance_at' => 'datetime',
         ];
     }
 
@@ -40,7 +41,13 @@ class Tenant extends Model
     /** Whether the shop's users may sign in and work right now. */
     public function isAccessible(): bool
     {
-        return $this->status === self::STATUS_ACTIVE && ! $this->isExpired();
+        return $this->status === self::STATUS_ACTIVE && ! $this->isExpired() && ! $this->inMaintenance();
+    }
+
+    /** Closed for a database restore; see App\Backups\BackupService. */
+    public function inMaintenance(): bool
+    {
+        return $this->maintenance_at !== null;
     }
 
     public function host(): string

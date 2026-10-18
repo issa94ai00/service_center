@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -144,6 +145,23 @@ class TenantManager
 
             return $output;
         });
+    }
+
+    /**
+     * Migrations the code ships that this shop's database has not run yet.
+     *
+     * @return list<string>
+     */
+    public function pendingMigrations(Tenant $tenant): array
+    {
+        $files = collect(glob(database_path('migrations/*.php')))
+            ->map(fn ($path) => basename($path, '.php'));
+
+        $ran = $this->tenancy->run($tenant, fn () => Schema::hasTable('migrations')
+            ? DB::table('migrations')->pluck('migration')
+            : collect());
+
+        return $files->diff($ran)->sort()->values()->all();
     }
 
     /** @return array<string, bool> feature key => on */

@@ -30,6 +30,26 @@ return [
 
     'disks' => [
 
+        // Database dumps (config/backups.php). Never served publicly.
+        'backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups'),
+            'throw' => true,
+        ],
+
+        // Offsite copy of the dumps on any S3-compatible store (AWS, B2, R2, Wasabi...).
+        'backups_offsite' => [
+            'driver' => 's3',
+            'key' => env('BACKUP_S3_KEY'),
+            'secret' => env('BACKUP_S3_SECRET'),
+            'region' => env('BACKUP_S3_REGION', 'auto'),
+            'bucket' => env('BACKUP_S3_BUCKET'),
+            'endpoint' => env('BACKUP_S3_ENDPOINT'),
+            'root' => env('BACKUP_S3_PREFIX', 'repair-backups'),
+            'use_path_style_endpoint' => (bool) env('BACKUP_S3_PATH_STYLE', false),
+            'throw' => true,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

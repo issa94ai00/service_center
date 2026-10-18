@@ -29,6 +29,11 @@ export function createAdminRouter() {
                         props: true,
                     },
                     {
+                        path: 'databases',
+                        name: 'databases',
+                        component: () => import('../views/platform/DatabasesView.vue'),
+                    },
+                    {
                         path: 'account',
                         name: 'account',
                         component: () => import('../views/platform/AccountView.vue'),

@@ -98,6 +98,21 @@
                 </dl>
             </section>
 
+            <!-- Maintenance -->
+            <div
+                v-if="tenant.maintenance_at"
+                class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 dark:border-sky-900/60 bg-sky-50 dark:bg-sky-950/40 px-4 py-3 text-sky-800 dark:text-sky-300"
+                role="status"
+            >
+                <p class="flex items-center gap-2 text-sm font-semibold">
+                    <AppIcon name="wrench" class="text-base" />
+                    المتجر مغلق أمام مستخدميه: {{ tenant.maintenance_reason || 'صيانة' }} ({{ timeAgo(tenant.maintenance_at) }}).
+                </p>
+                <button type="button" class="rounded-lg bg-white/70 dark:bg-slate-900/60 px-3 py-1.5 text-xs font-bold ring-1 ring-current/20 hover:bg-white dark:hover:bg-slate-900" :disabled="busy" @click="toggleMaintenance">
+                    إعادة فتح المتجر
+                </button>
+            </div>
+
             <!-- Subscription warning -->
             <div
                 v-if="tenant.status === 'active' && subscription.days !== null && subscription.days <= EXPIRING_SOON_DAYS"
@@ -247,13 +262,79 @@
                         </button>
                     </form>
 
-                    <!-- Maintenance -->
+                    <!-- Database -->
+                    <section class="space-y-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 class="flex items-center gap-2 text-[15px] font-bold text-slate-900 dark:text-white">
+                                <AppIcon name="database" class="text-slate-400" /> قاعدة البيانات
+                            </h2>
+                            <router-link :to="{ name: 'databases', query: { database: tenant.database } }" class="text-xs font-semibold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400">
+                                سجل النسخ
+                            </router-link>
+                        </div>
+
+                        <dl class="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <dt class="text-xs text-slate-400">آخر نسخة</dt>
+                                <dd
+                                    class="mt-0.5 font-semibold"
+                                    :class="backupStale ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200'"
+                                    :title="tenant.backups?.last_at ? formatDateTime(tenant.backups.last_at) : ''"
+                                >
+                                    {{ tenant.backups?.last_at ? timeAgo(tenant.backups.last_at) : 'لا توجد' }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-slate-400">النسخ المحفوظة</dt>
+                                <dd class="mt-0.5 font-semibold text-slate-800 dark:text-slate-200">{{ tenant.backups?.count ?? 0 }}</dd>
+                            </div>
+                        </dl>
+
+                        <div
+                            v-if="tenant.pending_migrations?.length"
+                            class="rounded-lg bg-cyan-50 dark:bg-cyan-950/40 p-2.5 text-xs text-cyan-800 dark:text-cyan-300"
+                        >
+                            <p class="font-bold">{{ tenant.pending_migrations.length }} تحديث بانتظار التطبيق</p>
+                            <ul class="mt-1 max-h-20 space-y-0.5 overflow-auto font-mono text-[10px] opacity-80" dir="ltr">
+                                <li v-for="m in tenant.pending_migrations" :key="m" class="truncate">{{ m }}</li>
+                            </ul>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" :class="SECONDARY" :disabled="busy" @click="backupNow">
+                                <AppIcon :name="backingUp ? 'refresh' : 'download'" :class="backingUp ? 'animate-spin' : ''" />
+                                {{ backingUp ? 'جارٍ النسخ...' : 'نسخ الآن' }}
+                            </button>
+                            <button
+                                type="button"
+                                :class="SECONDARY"
+                                :disabled="busy || !tenant.pending_migrations?.length"
+                                :title="tenant.pending_migrations?.length ? 'تؤخذ نسخة احتياطية تلقائياً قبل التحديث' : 'قاعدة البيانات محدّثة'"
+                                @click="migrate"
+                            >
+                                <AppIcon name="refresh" /> {{ tenant.pending_migrations?.length ? 'تحديث البنية' : 'محدّثة' }}
+                            </button>
+                        </div>
+
+                        <label class="flex cursor-pointer items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-3 text-sm">
+                            <span>
+                                <span class="block font-semibold text-slate-800 dark:text-slate-200">وضع الصيانة</span>
+                                <span class="block text-xs text-slate-500 dark:text-slate-400">يغلق المتجر مؤقتاً دون تغيير حالته</span>
+                            </span>
+                            <input type="checkbox" class="peer sr-only" :checked="Boolean(tenant.maintenance_at)" :disabled="busy" @change="toggleMaintenance" />
+                            <span
+                                class="relative h-5 w-9 shrink-0 rounded-full bg-[#cbd5e1] dark:bg-[#334155] transition peer-checked:bg-[#0284c7] peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500/40 after:absolute after:top-0.5 after:start-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow after:transition-all peer-checked:after:translate-x-4 rtl:peer-checked:after:-translate-x-4"
+                                aria-hidden="true"
+                            ></span>
+                        </label>
+                    </section>
+
+                    <!-- HTTPS -->
                     <section class="space-y-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                        <h2 class="flex items-center gap-2 text-[15px] font-bold text-slate-900 dark:text-white">
-                            <AppIcon name="wrench" class="text-slate-400" /> الصيانة التقنية
-                        </h2>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-slate-600 dark:text-slate-300">شهادة HTTPS</span>
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 class="flex items-center gap-2 text-[15px] font-bold text-slate-900 dark:text-white">
+                                <AppIcon name="shield" class="text-slate-400" /> شهادة HTTPS
+                            </h2>
                             <SslBadge :status="tenant.ssl_status" />
                         </div>
                         <p v-if="tenant.ssl_status !== 'issued'" class="rounded-lg bg-amber-50 dark:bg-amber-950/40 p-2.5 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
@@ -261,14 +342,9 @@
                             <code class="mt-1 block select-all font-mono text-[11px]" dir="ltr">php artisan tenants:certificate {{ tenant.slug }}</code>
                         </p>
                         <pre v-if="tenant.ssl_message" class="max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2 text-[11px] text-slate-600 dark:text-slate-300" dir="ltr">{{ tenant.ssl_message }}</pre>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button type="button" :class="SECONDARY" :disabled="busy" @click="issueCertificate">
-                                <AppIcon name="shield" /> {{ tenant.ssl_status === 'issued' ? 'تجديد الشهادة' : 'إصدار الشهادة' }}
-                            </button>
-                            <button type="button" :class="SECONDARY" :disabled="busy" @click="migrate">
-                                <AppIcon name="database" /> تحديث القاعدة
-                            </button>
-                        </div>
+                        <button type="button" :class="[SECONDARY, 'w-full']" :disabled="busy" @click="issueCertificate">
+                            {{ tenant.ssl_status === 'issued' ? 'تجديد / إعادة إصدار الشهادة' : 'إصدار الشهادة' }}
+                        </button>
                     </section>
                 </div>
             </div>
@@ -332,9 +408,10 @@ import FormField from '../../components/ui/FormField.vue';
 import SslBadge from '../../components/platform/SslBadge.vue';
 import TenantStatus from '../../components/platform/TenantStatus.vue';
 import { avatarTone, EXPIRING_SOON_DAYS, initials, subscriptionView } from '../../components/platform/subscription';
+import { timeAgo } from '../../components/platform/format';
 import { confirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
-import { tenantsApi } from '../../services/adminApi';
+import { backupsApi, tenantsApi } from '../../services/adminApi';
 import { apiMessage, formatDate, formatDateTime, isoDate } from '../../utils/format';
 
 const props = defineProps({ id: { type: [String, Number], required: true } });
@@ -362,6 +439,7 @@ const features = reactive({});
 const reset = reactive({ email: '', password: '' });
 const del = reactive({ confirm_slug: '', drop_database: false });
 const copied = ref(false);
+const backingUp = ref(false);
 
 /** What the form held when last loaded or saved, to tell unsaved edits apart. */
 const savedDetails = ref('');
@@ -371,6 +449,8 @@ const detailsDirty = computed(() => JSON.stringify(details) !== savedDetails.val
 const featuresDirty = computed(() => JSON.stringify(features) !== savedFeatures.value);
 const enabledCount = computed(() => Object.keys(meta.value.features || {}).filter((key) => features[key]).length);
 const subscription = computed(() => subscriptionView(tenant.value?.expires_at));
+// Mirrors config/backups.php stale_after_hours.
+const backupStale = computed(() => !tenant.value?.backups?.last_at || Date.now() - new Date(tenant.value.backups.last_at).getTime() > 30 * 36e5);
 
 const statCards = computed(() => {
     const s = tenant.value?.stats || {};
@@ -383,18 +463,6 @@ const statCards = computed(() => {
         { label: 'آخر نشاط', icon: 'clock', value: s.last_activity ? timeAgo(s.last_activity) : '—', title: s.last_activity ? formatDateTime(s.last_activity) : '' },
     ];
 });
-
-/** "منذ 3 ساعات" — the exact time stays in the tooltip. */
-function timeAgo(value) {
-    const minutes = Math.round((Date.now() - new Date(value).getTime()) / 6e4);
-    if (!Number.isFinite(minutes)) return '—';
-    if (minutes < 1) return 'الآن';
-    if (minutes < 60) return `منذ ${minutes} دقيقة`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 24) return `منذ ${hours} ساعة`;
-    const days = Math.round(hours / 24);
-    return days < 30 ? `منذ ${days} يوم` : formatDate(value);
-}
 
 function hydrate(data) {
     tenant.value = data;
@@ -513,7 +581,46 @@ async function issueCertificate() {
 }
 
 async function migrate() {
-    await run(() => tenantsApi.migrate(props.id), (r) => r.message);
+    const count = tenant.value.pending_migrations?.length ?? 0;
+    const ok = await confirm({
+        title: 'تحديث بنية قاعدة البيانات؟',
+        message: `سيُطبَّق ${count} تحديث على قاعدة بيانات ${tenant.value.name}. تؤخذ نسخة احتياطية تلقائياً قبل البدء.`,
+        confirmLabel: 'تحديث',
+    });
+    if (!ok) return;
+
+    const result = await run(() => tenantsApi.migrate(props.id), (r) => r.message);
+    if (result) await reload();
+}
+
+async function backupNow() {
+    backingUp.value = true;
+    const result = await run(() => backupsApi.create({ tenant_id: Number(props.id) }), (r) => r.message);
+    backingUp.value = false;
+    if (result) await reload();
+}
+
+async function toggleMaintenance() {
+    const on = !tenant.value.maintenance_at;
+    if (on && !(await confirm({
+        title: 'تفعيل وضع الصيانة؟',
+        message: 'لن يتمكن مستخدمو المتجر من الدخول حتى تعيد فتحه. لا تتغير حالة المتجر ولا اشتراكه.',
+        confirmLabel: 'إغلاق المتجر',
+        tone: 'danger',
+    }))) return;
+
+    const data = await run(() => tenantsApi.setMaintenance(props.id, on), on ? 'المتجر في وضع الصيانة.' : 'أُعيد فتح المتجر.');
+    if (data) tenant.value = { ...tenant.value, ...data };
+}
+
+/** Refresh the shop without resetting unsaved edits in the details form. */
+async function reload() {
+    try {
+        const data = await tenantsApi.show(props.id);
+        tenant.value = { ...tenant.value, ...data };
+    } catch {
+        // The action itself succeeded; a stale card is not worth an error.
+    }
 }
 
 async function destroy() {

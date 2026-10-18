@@ -12,6 +12,7 @@ const props = defineProps({ tenant: { type: Object, required: true } });
 
 const view = computed(() => {
     const t = props.tenant;
+    if (t.maintenance_at) return { label: 'صيانة', tone: 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400' };
     if (t.status === 'archived') return { label: 'مؤرشف', tone: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400' };
     if (t.status === 'suspended') return { label: 'موقوف', tone: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400' };
     if (t.is_expired) return { label: 'منتهي الاشتراك', tone: 'bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400' };

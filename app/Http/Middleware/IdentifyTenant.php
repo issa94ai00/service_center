@@ -71,6 +71,10 @@ class IdentifyTenant
             return $this->deny($request, Response::HTTP_FORBIDDEN, 'حساب هذا المتجر موقوف مؤقتاً. يرجى التواصل مع الدعم الفني.', $tenant);
         }
 
+        if ($tenant->inMaintenance()) {
+            return $this->deny($request, Response::HTTP_SERVICE_UNAVAILABLE, 'المتجر في صيانة مؤقتة لقاعدة البيانات. يرجى المحاولة بعد دقائق.', $tenant);
+        }
+
         if ($tenant->isExpired()) {
             return $this->deny($request, Response::HTTP_PAYMENT_REQUIRED, 'انتهى اشتراك هذا المتجر. يرجى التواصل مع الدعم الفني للتجديد.', $tenant);
         }
