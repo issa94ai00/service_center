@@ -121,6 +121,13 @@
         <main id="top">
             <!-- Hero -->
             <section class="relative isolate overflow-hidden pb-20 pt-12 sm:pt-20 lg:pb-28">
+                <!-- Background photo behind the headline, dimmed with the page colour and faded out before the mockup -->
+                <div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[680px] overflow-hidden sm:h-[760px]" aria-hidden="true">
+                    <img :src="heroPhoto" alt="" fetchpriority="high" decoding="async" class="h-full w-full object-cover object-center" />
+                    <!-- #0f172a: in dark mode app.css repaints .bg-white (the page) in this colour -->
+                    <div class="absolute inset-0 bg-white/85 dark:bg-[#0f172a]/85" />
+                    <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white dark:to-[#0f172a]" />
+                </div>
                 <div class="hero-grid pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
                 <div
                     class="pointer-events-none absolute left-1/2 top-0 -z-10 h-[560px] w-[min(1100px,140%)] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(34,211,238,0.28),rgba(37,99,235,0.14),transparent)] blur-2xl dark:bg-[radial-gradient(closest-side,rgba(34,211,238,0.18),rgba(37,99,235,0.12),transparent)]"
@@ -520,6 +527,7 @@ import AppIcon from '../../components/ui/AppIcon.vue';
 import { tenancy } from '../../tenancy';
 import { useTheme } from '../../composables/useTheme';
 import { useI18n } from '../../composables/useI18n';
+import heroPhoto from '../../../images/hero-repair.webp';
 
 const { isDark, toggleTheme } = useTheme();
 const { t, toggleLocale } = useI18n();
