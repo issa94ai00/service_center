@@ -10,7 +10,7 @@
             <div class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-8">
                 <a href="#top" class="flex min-w-0 items-center gap-2.5 rounded-xl focus-ring" @click="menuOpen = false">
                     <img :src="LOGO" alt="" class="h-9 w-9 shrink-0 rounded-xl shadow-sm ring-1 ring-slate-900/10 dark:ring-white/15" />
-                    <span class="truncate text-[15px] font-bold text-slate-950 dark:text-white">{{ t.brand.name }}</span>
+                    <span class="truncate text-[15px] font-bold text-slate-950 dark:text-white" :class="pastHero && !menuOpen ? 'max-sm:sr-only' : ''">{{ t.brand.name }}</span>
                 </a>
 
                 <nav
@@ -64,6 +64,16 @@
                     <router-link :to="primaryCta.to" :class="btnPrimary" class="px-4 py-2 text-sm max-sm:hidden">
                         {{ primaryCta.short }}
                     </router-link>
+                    <Transition name="pop">
+                        <router-link
+                            v-if="pastHero && !menuOpen"
+                            :to="primaryCta.to"
+                            :class="btnPrimary"
+                            class="whitespace-nowrap px-3 py-1.5 text-xs sm:hidden"
+                        >
+                            {{ primaryCta.short }}
+                        </router-link>
+                    </Transition>
                     <button
                         type="button"
                         :class="iconBtn"
@@ -235,7 +245,7 @@
                                                 @click="pickStep(col)"
                                             >
                                                 <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="stepDot[col]" />
-                                                <span class="truncate">{{ step.label }}</span>
+                                                <span class="leading-tight sm:truncate">{{ step.label }}</span>
                                             </button>
                                             <div class="flex min-h-[156px] flex-col gap-1.5 rounded-xl bg-slate-100/80 p-1.5 sm:min-h-[196px] sm:gap-2 sm:p-2 dark:bg-white/[0.03]">
                                                 <TransitionGroup name="ticket">
@@ -245,7 +255,7 @@
                                                         class="rounded-lg border border-cyan-400/60 bg-white p-2 shadow-md shadow-cyan-500/10 ring-2 ring-cyan-400/20 sm:p-2.5 dark:bg-slate-800"
                                                     >
                                                         <p class="font-mono text-[10px] font-bold text-cyan-600 dark:text-cyan-400">{{ t.mockup.ticketNo }}</p>
-                                                        <p class="mt-0.5 truncate text-[11px] font-bold text-slate-900 rtl:text-right sm:text-xs dark:text-white" dir="ltr">iPhone 13 Pro</p>
+                                                        <p class="mt-0.5 break-words text-[11px] font-bold leading-tight text-slate-900 rtl:text-right sm:truncate sm:text-xs dark:text-white" dir="ltr">iPhone 13 Pro</p>
                                                         <p class="mt-1 hidden text-[11px] leading-snug text-slate-500 sm:line-clamp-2 dark:text-slate-400">{{ t.mockup.issueDesc }}</p>
                                                     </div>
                                                     <div
@@ -254,7 +264,7 @@
                                                         class="rounded-lg border border-slate-200/80 bg-white p-2 sm:p-2.5 dark:border-white/5 dark:bg-slate-800/60"
                                                     >
                                                         <p class="font-mono text-[10px] text-slate-400">{{ card.id }}</p>
-                                                        <p class="mt-0.5 truncate text-[11px] font-semibold text-slate-700 rtl:text-right sm:text-xs dark:text-slate-300" dir="ltr">{{ card.device }}</p>
+                                                        <p class="mt-0.5 break-words text-[11px] font-semibold leading-tight text-slate-700 rtl:text-right sm:truncate sm:text-xs dark:text-slate-300" dir="ltr">{{ card.device }}</p>
                                                     </div>
                                                 </TransitionGroup>
                                             </div>
@@ -295,8 +305,8 @@
                     >
                         <dt class="sr-only">{{ fact.label }}</dt>
                         <dd>
-                            <span class="block text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl dark:text-white" dir="ltr">
-                                {{ fact.value }}<span v-if="fact.unit" class="ms-1 text-base font-semibold text-slate-500 dark:text-slate-400">{{ fact.unit }}</span>
+                            <span class="block text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl dark:text-white">
+                                <bdi dir="ltr">{{ fact.value }}</bdi><span v-if="fact.unit" class="ms-1 text-base font-semibold text-slate-500 dark:text-slate-400">{{ fact.unit }}</span>
                             </span>
                             <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">{{ fact.label }}</span>
                         </dd>
@@ -465,7 +475,7 @@
                     <div class="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
                         <router-link
                             :to="primaryCta.to"
-                            class="group inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-bold text-slate-950 transition hover:bg-cyan-50 focus-ring"
+                            class="group inline-flex items-center justify-center gap-2 rounded-full bg-[#fff] px-8 py-3.5 text-base font-bold text-slate-950 transition hover:bg-[#ecfeff] focus-ring"
                         >
                             {{ primaryCta.label }}
                             <AppIcon name="arrow-right" class="transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
@@ -619,12 +629,14 @@ function pickStep(idx) {
 
 // ------------------------------------------------------------ Header & scrollspy
 const scrolled = ref(false);
+const pastHero = ref(false);
 const menuOpen = ref(false);
 const activeSection = ref('');
 let sectionObserver = null;
 
 function onScroll() {
     scrolled.value = window.scrollY > 8;
+    pastHero.value = window.scrollY > 520;
 }
 
 function onLinkClick(id) {

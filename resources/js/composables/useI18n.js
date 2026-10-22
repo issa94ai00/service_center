@@ -253,7 +253,7 @@ export const messages = {
             items: [
                 { value: '6', label: 'مراحل لتتبّع كل جهاز' },
                 { value: '80 · 58 · A4', label: 'كل مقاسات الطباعة' },
-                { value: '< 1', unit: 'دقيقة', label: 'لتجهيز متجر جديد' },
+                { value: '1', unit: 'دقيقة', label: 'أو أقل لتجهيز متجر جديد' },
                 { value: 'AR · EN', label: 'واجهة عربية وإنجليزية' },
             ],
         },
