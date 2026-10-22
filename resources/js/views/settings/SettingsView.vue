@@ -175,6 +175,8 @@ const meta = {
     purchase_prefix: { label: 'بادئة فواتير الشراء', ltr: true, placeholder: 'PR-' },
     payment_prefix: { label: 'بادئة السندات', ltr: true, placeholder: 'PAY-' },
     adjustment_prefix: { label: 'بادئة تسويات المخزون', ltr: true, placeholder: 'ADJ-' },
+    sales_return_prefix: { label: 'بادئة مرتجعات المبيعات', ltr: true, placeholder: 'SRT-' },
+    purchase_return_prefix: { label: 'بادئة مرتجعات المشتريات', ltr: true, placeholder: 'PRT-' },
     repair_receipt_prefix: { label: 'بادئة إيصالات استلام الصيانة', ltr: true, placeholder: 'RPR-' },
     repair_invoice_prefix: {
         label: 'بادئة فواتير الصيانة',

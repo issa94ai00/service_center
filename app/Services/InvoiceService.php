@@ -245,6 +245,7 @@ class InvoiceService
             $invoice->lockForUpdate();
             $this->assertStatus($invoice, DocumentStatus::POSTED);
             $this->assertUnpaid($invoice);
+            $this->assertNoActiveReturns($invoice);
 
             $invoice->load('items');
 
@@ -297,6 +298,7 @@ class InvoiceService
             $invoice->lockForUpdate();
             $this->assertStatus($invoice, DocumentStatus::POSTED);
             $this->assertUnpaid($invoice);
+            $this->assertNoActiveReturns($invoice);
             $invoice->load('items');
 
             foreach ($invoice->items->where('line_type', LineType::MATERIAL) as $item) {
@@ -617,6 +619,18 @@ class InvoiceService
     {
         if ($invoice->status !== $expected) {
             throw new DocumentLockedException;
+        }
+    }
+
+    /**
+     * Cancelling reverses the invoice's full quantities and total; with a
+     * return standing against it that would put the returned goods back twice
+     * and credit the account twice.
+     */
+    protected function assertNoActiveReturns(PurchaseInvoice|SalesInvoice $invoice): void
+    {
+        if ($invoice->returns()->where('status', DocumentStatus::POSTED)->exists()) {
+            throw new BusinessRuleException(__('على هذه الفاتورة مرتجعات قائمة؛ ألغِ المرتجعات أولاً ثم الفاتورة.'));
         }
     }
 

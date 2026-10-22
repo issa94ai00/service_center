@@ -83,7 +83,9 @@ class PaymentService
                 $this->assertInvoicePostable($invoice, $payment, $allocation);
 
                 $newPaid = Money::fromDecimal($invoice->paid_amount)->add(Money::fromDecimal($allocation->amount));
-                $newRemaining = Money::fromDecimal($invoice->total)->subtract($newPaid);
+                // Moved by the allocation rather than rebuilt from the total:
+                // a return may already have taken part of the invoice off.
+                $newRemaining = Money::fromDecimal($invoice->remaining)->subtract(Money::fromDecimal($allocation->amount));
                 $invoice->update([
                     'paid_amount' => $newPaid->toDecimal(),
                     'remaining' => $newRemaining->toDecimal(),
@@ -179,7 +181,7 @@ class PaymentService
             $newPaid = Money::fromDecimal($invoice->paid_amount)->add($requested);
             $invoice->update([
                 'paid_amount' => $newPaid->toDecimal(),
-                'remaining' => Money::fromDecimal($invoice->total)->subtract($newPaid)->toDecimal(),
+                'remaining' => Money::fromDecimal($invoice->remaining)->subtract($requested)->toDecimal(),
             ]);
 
             return $requested->toDecimal();
@@ -273,7 +275,7 @@ class PaymentService
                 if ($newPaid->isNegative()) {
                     throw new BusinessRuleException(__('Invoice paid amount would become negative; cannot cancel this payment.'));
                 }
-                $newRemaining = Money::fromDecimal($invoice->total)->subtract($newPaid);
+                $newRemaining = Money::fromDecimal($invoice->remaining)->add(Money::fromDecimal($allocation->amount));
                 $invoice->update([
                     'paid_amount' => $newPaid->toDecimal(),
                     'remaining' => $newRemaining->toDecimal(),

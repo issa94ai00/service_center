@@ -7,8 +7,10 @@ use App\Models\Customer;
 use App\Models\CustomerTransaction;
 use App\Models\Payment;
 use App\Models\PurchaseInvoice;
+use App\Models\PurchaseReturn;
 use App\Models\Repair;
 use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
 use App\Models\Setting;
 use App\Models\Supplier;
 use App\Models\SupplierTransaction;
@@ -48,6 +50,8 @@ class StatementService
         SalesInvoice::class => 'invoice_no',
         PurchaseInvoice::class => 'invoice_no',
         Payment::class => 'reference_no',
+        SalesReturn::class => 'return_no',
+        PurchaseReturn::class => 'return_no',
         // بلاغ الصيانة يشتقّ رقمه من معرّفه ولا يخزّنه عموداً، فيُركَّب أدناه.
         Repair::class => 'id',
     ];
@@ -62,6 +66,8 @@ class StatementService
         SalesInvoice::class => 'sales_invoice',
         PurchaseInvoice::class => 'purchase_invoice',
         Payment::class => 'payment',
+        SalesReturn::class => 'sales_return',
+        PurchaseReturn::class => 'purchase_return',
         Repair::class => 'repair',
     ];
 
@@ -304,6 +310,10 @@ class StatementService
             TransactionType::SUPPLIER_PAYMENT => 'سند دفع',
             TransactionType::REPAIR_COMMISSION => 'عمولة صيانة',
             TransactionType::TECHNICIAN_PAYMENT => 'سند صرف لخبير',
+            TransactionType::SALES_RETURN => 'مرتجع بيع',
+            TransactionType::PURCHASE_RETURN => 'مرتجع شراء',
+            TransactionType::CUSTOMER_REFUND => 'ردّ مبلغ للعميل',
+            TransactionType::SUPPLIER_REFUND => 'مبلغ مستردّ من المورد',
             TransactionType::OPENING => 'رصيد افتتاحي',
             TransactionType::REVERSAL => 'قيد عكسي',
             TransactionType::ADJUSTMENT => 'تسوية',

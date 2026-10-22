@@ -31,7 +31,7 @@ class SalesController extends Controller
             // The device comes along so a settlement row can name it; on a page
             // of plain sales this costs one extra query returning nothing.
             ->with(['customer', 'repair'])
-            ->withCount('items')
+            ->withCount(['items', 'returns as active_returns_count' => fn (Builder $q) => $q->where('status', 'POSTED')])
             // 'REPAIR' narrows to maintenance settlements, 'SALES' to counter
             // sales; anything else leaves both in the listing as before.
             ->source($request->query('source'))
@@ -62,7 +62,7 @@ class SalesController extends Controller
     public function show(SalesInvoice $sale): JsonResponse
     {
         $this->authorize('view', $sale);
-        $sale->load(['customer', 'repair', 'items.service.unit', 'items.material', 'items.unit']);
+        $sale->load(['customer', 'repair', 'items.service.unit', 'items.material', 'items.unit', 'returns']);
 
         return response()->json(['data' => new SalesInvoiceResource($sale)]);
     }

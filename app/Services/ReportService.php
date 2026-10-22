@@ -9,9 +9,11 @@ use App\Models\Expense;
 use App\Models\Material;
 use App\Models\Payment;
 use App\Models\PurchaseInvoice;
+use App\Models\PurchaseReturn;
 use App\Models\Repair;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
+use App\Models\SalesReturn;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Technician;
@@ -158,8 +160,23 @@ class ReportService
             ->selectRaw('COALESCE(SUM(COALESCE(sales_invoice_items.cost_amount, sales_invoice_items.quantity * materials.cost_price)), 0) as cogs')
             ->value('cogs');
 
-        $netRevenueMoney = Money::fromDecimal($salesTotals?->total);
-        $cogsMoney = Money::fromDecimal($cogsRaw);
+        // Returns are dated when the goods came back, not when they were sold:
+        // a period's net sales are what it sold less what it took back, and
+        // the goods that came back stop counting as cost.
+        $salesReturns = SalesReturn::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('return_date', $dateRange)
+            ->selectRaw('COUNT(*) as count')
+            ->selectRaw('COALESCE(SUM(total), 0) as total')
+            ->selectRaw('COALESCE(SUM(cost_amount), 0) as cost')
+            ->selectRaw('COALESCE(SUM(refunded_amount), 0) as refunded')
+            ->first();
+        $returnsMoney = Money::fromDecimal($salesReturns?->total);
+        $returnedCostMoney = Money::fromDecimal($salesReturns?->cost);
+
+        $grossSalesMoney = Money::fromDecimal($salesTotals?->total);
+        $netRevenueMoney = $grossSalesMoney->subtract($returnsMoney);
+        $cogsMoney = Money::fromDecimal($cogsRaw)->subtract($returnedCostMoney);
         $grossProfitMoney = $netRevenueMoney->subtract($cogsMoney);
         $grossMargin = $netRevenueMoney->toCents() > 0
             ? round(($grossProfitMoney->toCents() / $netRevenueMoney->toCents()) * 100, 2)
@@ -197,6 +214,14 @@ class ReportService
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total), 0) as total')
             ->first();
 
+        $purchaseReturns = PurchaseReturn::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('return_date', $dateRange)
+            ->selectRaw('COUNT(*) as count')
+            ->selectRaw('COALESCE(SUM(total), 0) as total')
+            ->selectRaw('COALESCE(SUM(refunded_amount), 0) as refunded')
+            ->first();
+
         // 7. Cash flow totals for period
         $collectedFromCustomers = Payment::query()
             ->where('status', DocumentStatus::POSTED)
@@ -216,7 +241,14 @@ class ReportService
             ->whereBetween('payment_date', $dateRange)
             ->sum('amount');
 
+        // Cash handed back over the counter for a return, and cash a supplier
+        // handed back for one: money that moved without a payment voucher.
+        $refundedToCustomersMoney = Money::fromDecimal($salesReturns?->refunded);
+        $refundedBySuppliersMoney = Money::fromDecimal($purchaseReturns?->refunded);
+
         $netCashFlowMoney = Money::fromDecimal($collectedFromCustomers)
+            ->subtract($refundedToCustomersMoney)
+            ->add($refundedBySuppliersMoney)
             ->subtract(Money::fromDecimal($paidToSuppliers))
             ->subtract(Money::fromDecimal($paidToTechnicians))
             ->subtract($expenseAmountMoney);
@@ -257,8 +289,17 @@ class ReportService
             ->get()
             ->keyBy(fn ($r) => substr((string) $r->date, 0, 10));
 
+        $dailyReturns = SalesReturn::query()
+            ->where('status', DocumentStatus::POSTED)
+            ->whereBetween('return_date', $dateRange)
+            ->groupBy('return_date')
+            ->selectRaw('return_date as date, COALESCE(SUM(total), 0) as returns, COALESCE(SUM(cost_amount), 0) as cost')
+            ->get()
+            ->keyBy(fn ($r) => substr((string) $r->date, 0, 10));
+
         $allDates = collect()
             ->merge($dailySales->keys())
+            ->merge($dailyReturns->keys())
             ->merge($dailyCogs->keys())
             ->merge($dailyExpenses->keys())
             ->merge($dailyCommissions->keys())
@@ -266,9 +307,11 @@ class ReportService
             ->sort()
             ->values();
 
-        $byDay = $allDates->map(function (string $day) use ($dailySales, $dailyCogs, $dailyExpenses, $dailyCommissions) {
-            $rev = Money::fromDecimal($dailySales[$day]?->revenue ?? 0);
-            $cg = Money::fromDecimal($dailyCogs[$day]?->cogs ?? 0);
+        $byDay = $allDates->map(function (string $day) use ($dailySales, $dailyCogs, $dailyExpenses, $dailyCommissions, $dailyReturns) {
+            $rev = Money::fromDecimal($dailySales[$day]?->revenue ?? 0)
+                ->subtract(Money::fromDecimal($dailyReturns[$day]?->returns ?? 0));
+            $cg = Money::fromDecimal($dailyCogs[$day]?->cogs ?? 0)
+                ->subtract(Money::fromDecimal($dailyReturns[$day]?->cost ?? 0));
             $gp = $rev->subtract($cg);
             $exp = Money::fromDecimal($dailyExpenses[$day]?->expenses ?? 0);
             $comm = Money::fromDecimal($dailyCommissions[$day]?->commissions ?? 0);
@@ -280,6 +323,7 @@ class ReportService
                 'date' => $day,
                 'count' => (int) ($dailySales[$day]?->invoices ?? 0),
                 'revenue' => $rev->toDecimal(),
+                'returns' => Money::fromDecimal($dailyReturns[$day]?->returns ?? 0)->toDecimal(),
                 'cogs' => $cg->toDecimal(),
                 'gross_profit' => $gp->toDecimal(),
                 'expenses' => $exp->toDecimal(),
@@ -378,6 +422,12 @@ class ReportService
             'to' => $to,
             'revenue' => [
                 'total' => $netRevenueMoney->toDecimal(),
+                'gross_total' => $grossSalesMoney->toDecimal(),
+                'returns' => [
+                    'count' => (int) ($salesReturns?->count ?? 0),
+                    'total' => $returnsMoney->toDecimal(),
+                    'cost' => $returnedCostMoney->toDecimal(),
+                ],
                 'subtotal' => Money::fromDecimal($salesTotals?->subtotal)->toDecimal(),
                 'discount' => Money::fromDecimal($salesTotals?->discount)->toDecimal(),
                 'invoices_count' => (int) ($salesTotals?->count ?? 0),
@@ -420,9 +470,15 @@ class ReportService
             'purchases' => [
                 'count' => (int) ($purchasesTotal?->count ?? 0),
                 'total' => Money::fromDecimal($purchasesTotal?->total)->toDecimal(),
+                'returns' => [
+                    'count' => (int) ($purchaseReturns?->count ?? 0),
+                    'total' => Money::fromDecimal($purchaseReturns?->total)->toDecimal(),
+                ],
             ],
             'cash_flow' => [
                 'collected' => Money::fromDecimal($collectedFromCustomers)->toDecimal(),
+                'refunded_customers' => $refundedToCustomersMoney->toDecimal(),
+                'refunded_by_suppliers' => $refundedBySuppliersMoney->toDecimal(),
                 'paid_suppliers' => Money::fromDecimal($paidToSuppliers)->toDecimal(),
                 'paid_technicians' => Money::fromDecimal($paidToTechnicians)->toDecimal(),
                 'paid_expenses' => $expenseAmountMoney->toDecimal(),

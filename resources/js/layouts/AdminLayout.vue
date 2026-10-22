@@ -481,7 +481,9 @@ const navSections = [
         label: 'المبيعات والمشتريات',
         items: [
             { to: '/sales', label: 'فواتير البيع', icon: '🧾', permission: 'sales.view', feature: 'sales' },
+            { to: '/sales-returns', label: 'مرتجعات المبيعات', icon: '↩️', permission: 'sales.view', feature: 'sales' },
             { to: '/purchases', label: 'فواتير الشراء', icon: '📥', permission: 'purchases.view', feature: 'purchases' },
+            { to: '/purchase-returns', label: 'مرتجعات المشتريات', icon: '↪️', permission: 'purchases.view', feature: 'purchases' },
         ],
     },
     {

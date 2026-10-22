@@ -24,6 +24,11 @@
                         <span>خصومات ممنوحة:</span>
                         <span class="font-medium tabular-nums">-{{ formatUsd(summary.revenue.discount) }}</span>
                     </div>
+                    <!-- الصافي أعلاه بعد المرتجعات؛ يُذكر ما طُرح حتى لا يبدو أقلّ من مجموع الفواتير بلا سبب. -->
+                    <div v-if="Number(summary.revenue.returns?.total) > 0" class="flex items-center justify-between text-orange-600">
+                        <span>مرتجعات المبيعات ({{ formatCount(summary.revenue.returns.count) }}):</span>
+                        <span class="font-medium tabular-nums">-{{ formatUsd(summary.revenue.returns.total) }}</span>
+                    </div>
                 </div>
             </div>
 
@@ -197,6 +202,9 @@
                     </div>
                     <p class="mt-1 text-[11px] text-slate-400">
                         من أصل مبيعات {{ formatUsd(summary.revenue.total) }}
+                        <template v-if="Number(summary.cash_flow.refunded_customers) > 0">
+                            · رُدّ {{ formatUsd(summary.cash_flow.refunded_customers) }} عن مرتجعات
+                        </template>
                     </p>
                 </div>
 

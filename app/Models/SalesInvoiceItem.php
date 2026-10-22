@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\DocumentStatus;
 use App\Enums\LineType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SalesInvoiceItem extends Model
 {
@@ -45,5 +47,12 @@ class SalesInvoiceItem extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(ServiceUnit::class, 'unit_id');
+    }
+
+    /** Return lines against this line on returns that still stand. */
+    public function activeReturnItems(): HasMany
+    {
+        return $this->hasMany(SalesReturnItem::class, 'sales_invoice_item_id')
+            ->whereHas('salesReturn', fn ($q) => $q->where('status', DocumentStatus::POSTED));
     }
 }

@@ -78,6 +78,10 @@ class NumberingService
             // receipt number alone says which counter it came off.
             'REPAIR_PAYMENT' => Setting::get('repair_payment_prefix', 'RCV-'),
             'INVENTORY_ADJUSTMENT' => Setting::get('adjustment_prefix', 'ADJ-'),
+            // المرتجعات سلسلتان مستقلتان: رقم المرتجع وحده يقول إن البضاعة
+            // عادت، ومن أيّ اتجاه.
+            'SALES_RETURN' => Setting::get('sales_return_prefix', 'SRT-'),
+            'PURCHASE_RETURN' => Setting::get('purchase_return_prefix', 'PRT-'),
             // مصاريف الصندوق: سلسلة مستقلة حتى يقول رقم السند وحده إنه مصروف
             // تشغيل لا دفعة لمورد.
             'EXPENSE' => Setting::get('expense_prefix', 'EXP-'),

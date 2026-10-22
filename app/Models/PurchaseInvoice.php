@@ -13,7 +13,7 @@ class PurchaseInvoice extends Model
     protected $fillable = [
         'invoice_no', 'supplier_id', 'purchase_date', 'due_date', 'status',
         'discount_type', 'discount_value', 'discount_amount', 'subtotal', 'total',
-        'paid_amount', 'remaining', 'notes', 'created_by', 'posted_by', 'posted_at',
+        'paid_amount', 'returned_amount', 'remaining', 'notes', 'created_by', 'posted_by', 'posted_at',
         'cancelled_by', 'cancelled_at', 'cancellation_reason',
     ];
 
@@ -29,6 +29,7 @@ class PurchaseInvoice extends Model
             'subtotal' => 'decimal:2',
             'total' => 'decimal:2',
             'paid_amount' => 'decimal:2',
+            'returned_amount' => 'decimal:2',
             'remaining' => 'decimal:2',
             'posted_at' => 'datetime',
             'cancelled_at' => 'datetime',
@@ -43,6 +44,12 @@ class PurchaseInvoice extends Model
     public function items(): HasMany
     {
         return $this->hasMany(PurchaseInvoiceItem::class)->orderBy('sort');
+    }
+
+    /** Every return taken against this invoice, cancelled ones included. */
+    public function returns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class)->orderBy('id');
     }
 
     public function transactions(): HasMany

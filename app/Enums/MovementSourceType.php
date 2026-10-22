@@ -9,4 +9,6 @@ enum MovementSourceType: string
     case INVENTORY_ADJUSTMENT = 'INVENTORY_ADJUSTMENT';
     case MANUAL = 'MANUAL';
     case REVERSAL = 'REVERSAL';
+    case SALES_RETURN = 'SALES_RETURN';
+    case PURCHASE_RETURN = 'PURCHASE_RETURN';
 }

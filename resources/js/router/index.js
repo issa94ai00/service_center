@@ -110,6 +110,12 @@ const routes = [
                 meta: { feature: 'purchases', permission: 'purchases.create' },
             },
             {
+                path: 'purchase-returns',
+                name: 'purchase-returns',
+                component: () => import('../views/returns/ReturnsListView.vue'),
+                meta: { feature: 'purchases', permission: 'purchases.view', returnKind: 'purchases' },
+            },
+            {
                 path: 'sales',
                 name: 'sales',
                 component: () => import('../views/sales/SalesListView.vue'),
@@ -126,6 +132,12 @@ const routes = [
                 name: 'sales.edit',
                 component: () => import('../views/sales/SalesFormView.vue'),
                 meta: { feature: 'sales', permission: 'sales.create' },
+            },
+            {
+                path: 'sales-returns',
+                name: 'sales-returns',
+                component: () => import('../views/returns/ReturnsListView.vue'),
+                meta: { feature: 'sales', permission: 'sales.view', returnKind: 'sales' },
             },
             {
                 path: 'payments',

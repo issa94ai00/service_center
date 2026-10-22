@@ -29,7 +29,7 @@ class PurchasesController extends Controller
 
         $invoices = PurchaseInvoice::query()
             ->with(['supplier'])
-            ->withCount('items')
+            ->withCount(['items', 'returns as active_returns_count' => fn (Builder $q) => $q->where('status', 'POSTED')])
             ->when($request->filled('search'), fn (Builder $q) => $q->where('invoice_no', 'like', "%{$request->search}%"))
             ->when($request->filled('supplier_id'), fn (Builder $q) => $q->where('supplier_id', $request->supplier_id))
             ->when($request->filled('status'), fn (Builder $q) => $q->where('status', $request->status))
@@ -57,7 +57,7 @@ class PurchasesController extends Controller
     public function show(PurchaseInvoice $purchase): JsonResponse
     {
         $this->authorize('view', $purchase);
-        $purchase->load(['supplier', 'items.material', 'items.unit']);
+        $purchase->load(['supplier', 'items.material', 'items.unit', 'returns']);
 
         return response()->json(['data' => new PurchaseInvoiceResource($purchase)]);
     }

@@ -45,7 +45,10 @@
                         <tr v-else-if="!items.length" class="text-slate-400"><td colspan="7" class="px-4 py-8 text-center">لا توجد نتائج</td></tr>
                         <tr v-for="row in items" :key="row.id"
                             :class="posting?.id === row.id ? 'bg-emerald-50/70' : 'hover:bg-slate-50'">
-                            <td class="px-4 py-3 font-semibold text-slate-900" dir="ltr">{{ row.invoice_no || `مسودة#${row.id}` }}</td>
+                            <td class="px-4 py-3">
+                                <span class="font-semibold text-slate-900" dir="ltr">{{ row.invoice_no || `مسودة#${row.id}` }}</span>
+                                <span v-if="row.active_returns_count" class="ms-2 rounded bg-orange-100 px-1.5 py-0.5 text-[11px] font-semibold text-orange-700" :title="`عليها ${row.active_returns_count} مرتجع`">مرتجع</span>
+                            </td>
                             <td class="px-4 py-3 text-slate-600">{{ row.supplier?.name || '—' }}</td>
                             <td class="px-4 py-3 text-slate-600" dir="ltr">{{ row.purchase_date }}</td>
                             <td class="px-4 py-3 text-left font-semibold">{{ formatMoney(row.total) }}</td>
@@ -59,6 +62,8 @@
                                         class="text-slate-500 hover:text-slate-900">تعديل</RouterLink>
                                     <button v-if="row.status === 'DRAFT' && can('purchases.post')"
                                         class="text-emerald-600 hover:text-emerald-800" @click="post(row)">ترحيل</button>
+                                    <button v-if="row.status === 'POSTED' && can('purchases.return')"
+                                        class="text-sky-600 hover:text-sky-800" title="تسجيل مرتجع من هذه الفاتورة" @click="returnFor = row">إرجاع</button>
                                     <button v-if="row.status === 'POSTED' && can('purchases.cancel')"
                                         class="text-orange-600 hover:text-orange-800" @click="cancel(row)">إلغاء</button>
                                     <button v-if="row.status === 'DRAFT' && can('purchases.delete')"
@@ -91,6 +96,34 @@
                     <div><dt class="text-slate-500">الإجمالي</dt><dd class="font-bold">{{ formatMoney(detail.total) }}</dd></div>
                     <div><dt class="text-slate-500">المتبقي</dt><dd>{{ formatMoney(detail.remaining) }}</dd></div>
                 </dl>
+                <!-- المرتجعات على الفاتورة: الإجمالي لا يتغيّر بها، فمن دون هذا يبدو
+                     المتبقّي أقلّ من «الإجمالي − المدفوع» بلا تفسير. -->
+                <div v-if="detail.returns?.length || (detail.status === 'POSTED' && can('purchases.return'))"
+                    class="mt-4 rounded-xl border border-slate-200">
+                    <div class="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+                        <p class="text-xs font-semibold text-slate-600">
+                            المرتجعات
+                            <span v-if="activeReturnsTotal > 0" class="ms-1 text-orange-600">· {{ formatMoney(activeReturnsTotal) }}</span>
+                        </p>
+                        <button v-if="detail.status === 'POSTED' && can('purchases.return')" type="button"
+                            class="rounded-md bg-orange-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-orange-700"
+                            @click="returnFor = detail">+ تسجيل مرتجع</button>
+                    </div>
+                    <p v-if="!detail.returns?.length" class="px-3 py-3 text-xs text-slate-400">لا مرتجعات على هذه الفاتورة.</p>
+                    <ul v-else class="divide-y divide-slate-100">
+                        <li v-for="r in detail.returns" :key="r.id" class="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                            <RouterLink :to="{ name: 'purchase-returns', query: { search: r.return_no } }" class="flex min-w-0 items-center gap-2 hover:underline">
+                                <span class="font-semibold text-slate-800" dir="ltr">{{ r.return_no }}</span>
+                                <span class="text-slate-400" dir="ltr">{{ r.return_date }}</span>
+                                <span class="truncate text-slate-500">{{ r.reason }}</span>
+                            </RouterLink>
+                            <span class="flex shrink-0 items-center gap-2">
+                                <span class="font-semibold tabular-nums" :class="r.status === 'CANCELLED' ? 'text-slate-400 line-through' : ''">{{ formatMoney(r.total) }}</span>
+                                <StatusBadge :status="r.status" />
+                            </span>
+                        </li>
+                    </ul>
+                </div>
                 <div v-if="detail.notes" class="mt-3 text-sm text-slate-600">ملاحظات: {{ detail.notes }}</div>
                 <div v-if="detail.cancellation_reason" class="mt-3 rounded bg-orange-50 px-3 py-2 text-sm text-orange-700">
                     سبب الإلغاء: {{ detail.cancellation_reason }}
@@ -120,12 +153,15 @@
             @posted="onPosted"
             @stale="posting = null; fetchData({ keep: true })"
         />
+
+        <ReturnModal :open="Boolean(returnFor)" kind="purchases" :invoice="returnFor"
+            @close="returnFor = null" @saved="onReturnSaved" />
     </div>
 </template>
 
 <script setup>
 import { BASE_SYMBOL } from '../../constants/currency';
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { documentsApi, purchasesApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
@@ -134,6 +170,7 @@ import { confirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import { apiMessage } from '../../utils/format';
 import BaseModal from '../../components/ui/BaseModal.vue';
+import ReturnModal from '../../components/returns/ReturnModal.vue';
 import StatusBadge from '../../components/ui/StatusBadge.vue';
 import PrintButton from '../../components/ui/PrintButton.vue';
 import PurchasePostModal from '../../components/purchases/PurchasePostModal.vue';
@@ -160,7 +197,20 @@ const from = ref('');
 const to = ref('');
 const detail = ref(null);
 const posting = ref(null);
+const returnFor = ref(null);
+
+/** What the standing returns took back, cancelled ones aside. */
+const activeReturnsTotal = computed(() => (detail.value?.returns ?? [])
+    .filter((r) => r.status === 'POSTED')
+    .reduce((sum, r) => sum + (Number(r.total) || 0), 0));
 const toast = useToast();
+
+function onReturnSaved(data) {
+    returnFor.value = null;
+    toast.success(data?.message || 'تم تسجيل المرتجع.');
+    if (detail.value) openDetail(detail.value);
+    fetchData({ keep: true });
+}
 let t = null;
 
 watch([search, statusFilter, from, to], () => {

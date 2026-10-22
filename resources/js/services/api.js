@@ -449,6 +449,43 @@ export const purchasesApi = {
     },
 };
 
+/**
+ * Returns against posted invoices. The two sides share one shape so the return
+ * modal and the returns list can drive either with a `kind` switch.
+ */
+function returnsApi(invoicePath, returnsPath) {
+    return {
+        /** The invoice's lines with what can still come back, and its returns so far. */
+        async returnable(invoiceId) {
+            const { data } = await api.get(`/${invoicePath}/${invoiceId}/returnable`);
+            return data.data;
+        },
+
+        async store(invoiceId, payload) {
+            const { data } = await api.post(`/${invoicePath}/${invoiceId}/returns`, payload);
+            return data;
+        },
+
+        async index(params = {}) {
+            const { data } = await api.get(`/${returnsPath}`, { params });
+            return data;
+        },
+
+        async show(id) {
+            const { data } = await api.get(`/${returnsPath}/${id}`);
+            return data;
+        },
+
+        async cancel(id, payload) {
+            const { data } = await api.post(`/${returnsPath}/${id}/cancel`, payload);
+            return data;
+        },
+    };
+}
+
+export const salesReturnsApi = returnsApi('sales', 'sales-returns');
+export const purchaseReturnsApi = returnsApi('purchases', 'purchase-returns');
+
 export const salesApi = {
     async index(params = {}) {
         const { data } = await api.get('/sales', { params });

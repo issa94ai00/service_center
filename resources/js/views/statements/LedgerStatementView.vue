@@ -778,6 +778,9 @@ function transactionBadgeClass(row) {
     const refKind = row?.reference?.kind;
     const label = String(row?.type_label || '');
 
+    if (refKind === 'sales_return' || refKind === 'purchase_return' || label.includes('مرتجع')) {
+        return 'border-orange-200 bg-orange-50 text-orange-700';
+    }
     if (refKind === 'sales_invoice' || label.includes('مبيعات')) {
         return 'border-blue-200 bg-blue-50 text-blue-700';
     }
@@ -795,6 +798,13 @@ function transactionBadgeClass(row) {
 
 function referenceRoute(reference, row) {
     if (!reference) return null;
+
+    // المرتجعات تُفتح من قائمتها مصفّاة برقمها؛ لا شاشة تحرير لها.
+    if (reference.kind === 'sales_return' || reference.kind === 'purchase_return') {
+        return row?.reference_no
+            ? { name: reference.kind === 'sales_return' ? 'sales-returns' : 'purchase-returns', query: { search: row.reference_no } }
+            : null;
+    }
 
     if (reference.kind === 'repair') {
         return row?.reference_no

@@ -30,6 +30,7 @@ class SalesInvoiceResource extends JsonResource
             'subtotal' => $this->subtotal,
             'total' => $this->total,
             'paid_amount' => $this->paid_amount,
+            'returned_amount' => $this->returned_amount,
             'remaining' => $this->remaining,
             'notes' => $this->notes,
             'posted_by' => $this->posted_by,
@@ -37,6 +38,17 @@ class SalesInvoiceResource extends JsonResource
             'cancelled_at' => $this->cancelled_at?->toISOString(),
             'cancellation_reason' => $this->cancellation_reason,
             'items' => SalesInvoiceItemResource::collection($this->whenLoaded('items')),
+            // Returns standing against the invoice; the list badges the row and
+            // the detail lists them, so neither has to ask the returns screen.
+            'active_returns_count' => $this->whenCounted('active_returns'),
+            'returns' => $this->whenLoaded('returns', fn () => $this->returns->map(fn ($return) => [
+                'id' => $return->id,
+                'return_no' => $return->return_no,
+                'return_date' => $return->return_date?->format('Y-m-d'),
+                'status' => $return->status,
+                'total' => $return->total,
+                'reason' => $return->reason,
+            ])),
             'created_by' => $this->created_by,
         ];
     }

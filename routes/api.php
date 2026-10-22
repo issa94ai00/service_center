@@ -13,11 +13,13 @@ use App\Http\Controllers\Api\MaterialCategoriesController;
 use App\Http\Controllers\Api\MaterialsController;
 use App\Http\Controllers\Api\PaymentsController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PurchaseReturnsController;
 use App\Http\Controllers\Api\PurchasesController;
 use App\Http\Controllers\Api\RepairsController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\RolesController;
 use App\Http\Controllers\Api\SalesController;
+use App\Http\Controllers\Api\SalesReturnsController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\ServiceUnitsController;
 use App\Http\Controllers\Api\SettingsController;
@@ -197,6 +199,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
             ->parameters(['purchase' => 'purchase']);
         Route::post('/purchases/{purchase}/post', [PurchasesController::class, 'post']);
         Route::post('/purchases/{purchase}/cancel', [PurchasesController::class, 'cancel']);
+        Route::get('/purchases/{purchase}/returnable', [PurchaseReturnsController::class, 'returnable']);
+        Route::post('/purchases/{purchase}/returns', [PurchaseReturnsController::class, 'store']);
+        Route::get('/purchase-returns', [PurchaseReturnsController::class, 'index']);
+        Route::get('/purchase-returns/{purchaseReturn}', [PurchaseReturnsController::class, 'show']);
+        Route::post('/purchase-returns/{purchaseReturn}/cancel', [PurchaseReturnsController::class, 'cancel']);
     });
 
     Route::middleware('feature:sales')->group(function () {
@@ -205,6 +212,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
             ->parameters(['sale' => 'sale']);
         Route::post('/sales/{sale}/post', [SalesController::class, 'post']);
         Route::post('/sales/{sale}/cancel', [SalesController::class, 'cancel']);
+        Route::get('/sales/{sale}/returnable', [SalesReturnsController::class, 'returnable']);
+        Route::post('/sales/{sale}/returns', [SalesReturnsController::class, 'store']);
+        Route::get('/sales-returns', [SalesReturnsController::class, 'index']);
+        Route::get('/sales-returns/{salesReturn}', [SalesReturnsController::class, 'show']);
+        Route::post('/sales-returns/{salesReturn}/cancel', [SalesReturnsController::class, 'cancel']);
     });
 
     // مصاريف الصندوق: لا مسودة لها ولا تخصيص، فليس لها إلا التسجيل والتصحيح
